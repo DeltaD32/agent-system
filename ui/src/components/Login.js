@@ -9,16 +9,18 @@ import {
   makeStyles,
   CircularProgress,
   Snackbar,
+  Box,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import AuthService from '../services/AuthService';
 
 const useStyles = makeStyles((theme) => ({
-  container: {
-    marginTop: theme.spacing(8),
+  root: {
+    minHeight: '100vh',
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.palette.background.default,
   },
   paper: {
     padding: theme.spacing(4),
@@ -27,10 +29,11 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
     width: '100%',
     maxWidth: '400px',
+    backgroundColor: theme.palette.background.paper,
   },
   form: {
     width: '100%',
-    marginTop: theme.spacing(1),
+    marginTop: theme.spacing(2),
   },
   submit: {
     margin: theme.spacing(3, 0, 2),
@@ -45,10 +48,15 @@ const useStyles = makeStyles((theme) => ({
   },
   wrapper: {
     position: 'relative',
+    width: '100%',
   },
   hint: {
     marginTop: theme.spacing(2),
     color: theme.palette.text.secondary,
+    textAlign: 'center',
+    padding: theme.spacing(1),
+    backgroundColor: theme.palette.action.hover,
+    borderRadius: theme.shape.borderRadius,
   },
 }));
 
@@ -60,31 +68,43 @@ function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({ username: false, password: false });
 
-  console.log('Login component rendered', { location });
+  const validateFields = () => {
+    const errors = {
+      username: !username,
+      password: !password,
+    };
+    setFieldErrors(errors);
+    return !errors.username && !errors.password;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login attempt', { username });
+    if (!validateFields()) {
+      setError('Please enter both username and password');
+      return;
+    }
+
     setLoading(true);
     setError('');
+    setFieldErrors({ username: false, password: false });
 
     try {
       await AuthService.login(username, password);
-      const { from } = location.state || { from: { pathname: '/' } };
-      console.log('Login successful, redirecting to:', from);
-      history.push(from);
+      const { from } = location.state || { pathname: '/' };
+      history.replace(from);
     } catch (error) {
-      console.error('Login error:', error);
       setError(error.message);
+      setFieldErrors({ username: true, password: true });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <div className={classes.container}>
+    <Box className={classes.root}>
+      <Container maxWidth="xs">
         <Paper className={classes.paper} elevation={3}>
           <Typography component="h1" variant="h5" gutterBottom>
             Sign in to Agent System
@@ -104,9 +124,13 @@ function Login() {
               autoComplete="username"
               autoFocus
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                setFieldErrors({ ...fieldErrors, username: false });
+              }}
               disabled={loading}
-              error={!!error}
+              error={fieldErrors.username}
+              helperText={fieldErrors.username ? 'Username is required' : ''}
             />
             <TextField
               variant="outlined"
@@ -119,9 +143,13 @@ function Login() {
               id="password"
               autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setFieldErrors({ ...fieldErrors, password: false });
+              }}
               disabled={loading}
-              error={!!error}
+              error={fieldErrors.password}
+              helperText={fieldErrors.password ? 'Password is required' : ''}
             />
             <div className={classes.wrapper}>
               <Button
@@ -136,13 +164,15 @@ function Login() {
               </Button>
             </div>
           </form>
-          <Typography variant="body2" className={classes.hint}>
-            Default admin credentials:<br />
-            Username: admin<br />
-            Password: adminadmin
-          </Typography>
+          <Paper variant="outlined" className={classes.hint}>
+            <Typography variant="body2">
+              Default admin credentials:<br />
+              Username: admin<br />
+              Password: adminadmin
+            </Typography>
+          </Paper>
         </Paper>
-      </div>
+      </Container>
       <Snackbar 
         open={!!error} 
         autoHideDuration={6000} 
@@ -153,7 +183,7 @@ function Login() {
           {error}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 }
 

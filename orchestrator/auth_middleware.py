@@ -1,44 +1,58 @@
+import os
+import jwt
 from functools import wraps
 from flask import request, jsonify
-import jwt
-import os
 from datetime import datetime, timedelta
 
-SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your-secret-key')
+# JWT configuration
+JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key')
+JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', 24))
 
-def create_service_tokens(user_data):
-    """Create tokens for different services"""
-    return {
-        'grafana': create_grafana_token(user_data),
-        'prometheus': create_prometheus_token(user_data),
-        'rabbitmq': create_rabbitmq_token(user_data)
-    }
-
-def create_jwt_token(user_data):
-    """Create JWT token for main authentication"""
+def create_jwt_token(username):
+    """Create a JWT token for the given username"""
     payload = {
-        'user_id': user_data['id'],
-        'username': user_data['username'],
-        'exp': datetime.utcnow() + timedelta(days=1)
+        'username': username,
+        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
+        'iat': datetime.utcnow()
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+    return jwt.encode(payload, JWT_SECRET, algorithm='HS256')
 
 def token_required(f):
+    """Decorator to protect routes with JWT token"""
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
+        
+        # Get token from header
         if 'Authorization' in request.headers:
-            token = request.headers['Authorization'].split(' ')[1]
+            auth_header = request.headers['Authorization']
+            try:
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                return jsonify({'error': 'Token is missing'}), 401
         
         if not token:
-            return jsonify({'message': 'Token is missing'}), 401
+            return jsonify({'error': 'Token is missing'}), 401
         
         try:
-            data = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            current_user = data
-        except:
-            return jsonify({'message': 'Token is invalid'}), 401
+            # Verify token
+            data = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+            current_user = data['username']
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Token is invalid'}), 401
         
         return f(current_user, *args, **kwargs)
     
-    return decorated 
+    return decorated
+
+def require_auth(f):
+    """Legacy decorator for basic auth - keeping for backward compatibility"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth:
+            return jsonify({'error': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated

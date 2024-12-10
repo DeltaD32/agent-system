@@ -8,4 +8,5 @@ python-dotenv==0.19.0
 ollama==0.1.0
 flask-cors==3.0.10
 simple-websocket==0.10.1
-colorlog==6.7.0 
+colorlog==6.7.0
+PyJWT==2.3.0 

@@ -1,0 +1,43 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "System Overview",
+    "tags": [],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "5s",
+    "panels": [
+      {
+        "title": "Active Tasks",
+        "type": "gauge",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "active_tasks"
+          }
+        ]
+      },
+      {
+        "title": "Worker Connections",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "worker_connections"
+          }
+        ]
+      },
+      {
+        "title": "Projects Created",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "projects_created_total"
+          }
+        ]
+      }
+    ]
+  }
+} 

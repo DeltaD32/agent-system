@@ -1,15 +1,78 @@
-# Agent System
+# AI Agent Orchestration System
 
-A distributed system for managing and orchestrating AI agents using Mistral and OLLAMA.
+A distributed system for managing and orchestrating AI agents using Mistral and OLLAMA, with real-time monitoring and project management capabilities.
 
 ## Features
 
+### Core Features
 - Distributed task processing with worker agents
+- Project templates and task management
 - Real-time monitoring and metrics
 - Web-based UI for system management
+- Authentication and authorization
+
+### Project Management
+- Project creation from templates
+- Task assignment and tracking
+- Progress monitoring
+- Dependencies management
+- Priority-based scheduling
+
+### Analytics & Monitoring
 - Prometheus metrics integration
 - Grafana dashboards
-- Docker containerization
+- System health monitoring
+- Agent performance tracking
+- Real-time status updates
+
+### Security
+- JWT-based authentication
+- Role-based access control
+- Secure API endpoints
+- Environment variable management
+
+### AI Integration
+- OLLAMA integration for AI tasks
+- Mistral model support
+- Extensible agent system
+- Task result analysis
+
+## Architecture
+
+### Components
+1. **Frontend (UI)**
+   - React-based web interface
+   - Material-UI components
+   - Real-time WebSocket updates
+   - Embedded Grafana dashboards
+
+2. **Backend (Orchestrator)**
+   - Flask REST API
+   - WebSocket server
+   - Task distribution
+   - Project management
+
+3. **Worker Agents**
+   - Distributed task processing
+   - Mistral model integration
+   - Automatic task queue management
+   - Health reporting
+
+4. **Monitoring**
+   - Prometheus metrics
+   - Grafana dashboards
+   - System health checks
+   - Performance tracking
+
+5. **Message Queue**
+   - RabbitMQ for task distribution
+   - Durable message storage
+   - Worker load balancing
+
+6. **Database**
+   - PostgreSQL for data persistence
+   - Project and task storage
+   - Agent state management
 
 ## Prerequisites
 
@@ -17,16 +80,18 @@ A distributed system for managing and orchestrating AI agents using Mistral and 
 - OLLAMA with Mistral model installed
 - Node.js 14+ (for development)
 - Python 3.9+
+- PostgreSQL 13+
+- RabbitMQ 3+
 
 ## Quick Start
 
 1. Clone the repository:
 ```bash
-git clone [repository-url]
-cd project
+git clone https://github.com/yourusername/agent-orchestration.git
+cd agent-orchestration
 ```
 
-2. Create a `.env` file with required environment variables:
+2. Create a `.env` file:
 ```bash
 # Database Configuration
 POSTGRES_USER=projectuser
@@ -37,8 +102,13 @@ POSTGRES_DB=project_db
 RABBITMQ_DEFAULT_USER=guest
 RABBITMQ_DEFAULT_PASS=guest
 
+# JWT Configuration
+JWT_SECRET=your-secret-key
+JWT_EXPIRATION_HOURS=24
+
 # Grafana Configuration
-GRAFANA_ADMIN_PASSWORD=your_secure_password
+GF_SECURITY_ADMIN_PASSWORD=admin
+GF_AUTH_ANONYMOUS_ENABLED=true
 ```
 
 3. Start the services:
@@ -52,7 +122,7 @@ docker-compose up -d
 - Prometheus: http://localhost:9090
 - RabbitMQ Management: http://localhost:15672
 
-## Development
+## Development Setup
 
 1. Install dependencies:
 ```bash
@@ -84,16 +154,47 @@ cd ../worker_agent
 python worker.py
 ```
 
-## Architecture
+## API Documentation
 
-The system consists of several components:
+### Authentication
+- POST `/api/login` - Get JWT token
+- POST `/api/logout` - Invalidate token
 
-- **UI**: React-based web interface
-- **Orchestrator**: Flask-based API server
-- **Worker Agents**: Python-based task processors
-- **Message Queue**: RabbitMQ for task distribution
-- **Database**: PostgreSQL for data storage
-- **Metrics**: Prometheus and Grafana for monitoring
+### Projects
+- GET `/api/projects` - List all projects
+- POST `/api/project` - Create new project
+- GET `/api/project/<id>` - Get project details
+- PUT `/api/project/<id>` - Update project
+- DELETE `/api/project/<id>` - Delete project
+
+### Tasks
+- GET `/api/tasks` - List all tasks
+- POST `/api/tasks` - Create new task
+- GET `/api/tasks/<id>` - Get task details
+- PUT `/api/tasks/<id>` - Update task
+- POST `/api/tasks/<id>/assign` - Assign task to agent
+
+### Templates
+- GET `/api/templates` - List all templates
+- POST `/api/templates` - Create new template
+- DELETE `/api/templates/<id>` - Delete template
+
+### Monitoring
+- GET `/health` - System health status
+- GET `/metrics` - Prometheus metrics
+
+## Testing
+
+Run the test suite:
+```bash
+# Run backend tests
+cd orchestrator
+python -m pytest
+
+# Run frontend tests
+cd ../ui
+npm test
+```
 
 ## Contributing
 
@@ -105,4 +206,4 @@ The system consists of several components:
 
 ## License
 
-MIT License 
+MIT License - see LICENSE file for details 

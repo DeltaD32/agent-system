@@ -6,10 +6,12 @@ import AssignmentIcon from '@material-ui/icons/Assignment';
 import BubbleChartIcon from '@material-ui/icons/BubbleChart';
 import TimelineIcon from '@material-ui/icons/Timeline';
 import SettingsIcon from '@material-ui/icons/Settings';
+import ExitToAppIcon from '@material-ui/icons/ExitToApp';
+import AuthService from '../services/AuthService';
 
 const useStyles = makeStyles((theme) => ({
-  root: {
-    flexGrow: 1,
+  appBar: {
+    zIndex: theme.zIndex.drawer + 1,
   },
   menuButton: {
     marginRight: theme.spacing(2),
@@ -23,9 +25,16 @@ const useStyles = makeStyles((theme) => ({
   },
   title: {
     flexGrow: 1,
+    color: 'white',
+    textDecoration: 'none',
+    '&:hover': {
+      textDecoration: 'none',
+    },
   },
   toolbar: {
     justifyContent: 'space-between',
+    paddingLeft: theme.spacing(2),
+    paddingRight: theme.spacing(2),
   },
   leftButtons: {
     display: 'flex',
@@ -40,60 +49,74 @@ const useStyles = makeStyles((theme) => ({
 function Navigation() {
   const classes = useStyles();
 
+  const handleLogout = () => {
+    AuthService.logout();
+  };
+
   return (
-    <div className={classes.root}>
-      <AppBar position="static">
-        <Toolbar className={classes.toolbar}>
-          <div className={classes.leftButtons}>
-            <Typography variant="h6" className={classes.title}>
-              Agent System
-            </Typography>
-            <Button
-              component={RouterLink}
-              to="/"
-              className={classes.menuButton}
-              startIcon={<DashboardIcon />}
-            >
-              Dashboard
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/projects"
-              className={classes.menuButton}
-              startIcon={<AssignmentIcon />}
-            >
-              Projects
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/agents"
-              className={classes.menuButton}
-              startIcon={<BubbleChartIcon />}
-            >
-              Agents
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/metrics"
-              className={classes.menuButton}
-              startIcon={<TimelineIcon />}
-            >
-              Metrics
-            </Button>
-          </div>
-          <div className={classes.rightButtons}>
-            <Button
-              component={RouterLink}
-              to="/settings"
-              className={classes.menuButton}
-              startIcon={<SettingsIcon />}
-            >
-              Settings
-            </Button>
-          </div>
-        </Toolbar>
-      </AppBar>
-    </div>
+    <AppBar position="fixed" className={classes.appBar}>
+      <Toolbar className={classes.toolbar}>
+        <div className={classes.leftButtons}>
+          <Typography
+            component={RouterLink}
+            to="/"
+            variant="h6"
+            className={classes.title}
+          >
+            Agent System
+          </Typography>
+          <Button
+            component={RouterLink}
+            to="/"
+            className={classes.menuButton}
+            startIcon={<DashboardIcon />}
+          >
+            Dashboard
+          </Button>
+          <Button
+            component={RouterLink}
+            to="/projects"
+            className={classes.menuButton}
+            startIcon={<AssignmentIcon />}
+          >
+            Projects
+          </Button>
+          <Button
+            component={RouterLink}
+            to="/agents"
+            className={classes.menuButton}
+            startIcon={<BubbleChartIcon />}
+          >
+            Agents
+          </Button>
+          <Button
+            component={RouterLink}
+            to="/metrics"
+            className={classes.menuButton}
+            startIcon={<TimelineIcon />}
+          >
+            Metrics
+          </Button>
+        </div>
+        <div className={classes.rightButtons}>
+          <Button
+            component={RouterLink}
+            to="/settings"
+            className={classes.menuButton}
+            startIcon={<SettingsIcon />}
+          >
+            Settings
+          </Button>
+          <Button
+            className={classes.menuButton}
+            startIcon={<ExitToAppIcon />}
+            onClick={handleLogout}
+          >
+            Logout
+          </Button>
+        </div>
+      </Toolbar>
+    </AppBar>
   );
 }
 

@@ -12,10 +12,49 @@ import {
   Chip,
   Box,
   makeStyles,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@material-ui/core';
+import {
+  Add as AddIcon,
+  Save as SaveIcon,
+} from '@material-ui/icons';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+const DEFAULT_TEMPLATES = [
+  {
+    id: 'web-app',
+    name: 'Web Application',
+    description: 'Template for web application development projects',
+    tasks: [
+      { description: 'Setup project repository', status: 'pending' },
+      { description: 'Create frontend structure', status: 'pending' },
+      { description: 'Setup backend API', status: 'pending' },
+      { description: 'Implement authentication', status: 'pending' },
+      { description: 'Setup database', status: 'pending' },
+    ],
+  },
+  {
+    id: 'ml-project',
+    name: 'Machine Learning Project',
+    description: 'Template for machine learning projects',
+    tasks: [
+      { description: 'Data collection and preprocessing', status: 'pending' },
+      { description: 'Exploratory data analysis', status: 'pending' },
+      { description: 'Model development', status: 'pending' },
+      { description: 'Model training and validation', status: 'pending' },
+      { description: 'Deployment and monitoring', status: 'pending' },
+    ],
+  },
+];
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -41,6 +80,13 @@ const useStyles = makeStyles((theme) => ({
   statusChip: {
     marginLeft: theme.spacing(1),
   },
+  templateSelect: {
+    marginBottom: theme.spacing(2),
+    minWidth: '100%',
+  },
+  saveTemplateButton: {
+    marginTop: theme.spacing(2),
+  },
 }));
 
 function Projects() {
@@ -50,6 +96,54 @@ function Projects() {
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [error, setError] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
+  const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+
+  useEffect(() => {
+    // Load templates from localStorage or use defaults
+    const savedTemplates = localStorage.getItem('projectTemplates');
+    if (savedTemplates) {
+      setTemplates([...DEFAULT_TEMPLATES, ...JSON.parse(savedTemplates)]);
+    }
+  }, []);
+
+  const handleTemplateChange = (event) => {
+    const templateId = event.target.value;
+    setSelectedTemplate(templateId);
+    
+    if (templateId) {
+      const template = templates.find(t => t.id === templateId);
+      if (template) {
+        setProjectName(template.name);
+        setProjectDescription(template.description);
+      }
+    }
+  };
+
+  const handleSaveAsTemplate = () => {
+    if (!projectName || !projectDescription) {
+      setError('Please fill in project details before saving as template');
+      return;
+    }
+    setSaveTemplateDialogOpen(true);
+  };
+
+  const handleSaveTemplate = () => {
+    const newTemplate = {
+      id: `template-${Date.now()}`,
+      name: newTemplateName,
+      description: projectDescription,
+      tasks: [],
+    };
+
+    const updatedTemplates = [...templates, newTemplate];
+    setTemplates(updatedTemplates);
+    localStorage.setItem('projectTemplates', JSON.stringify(updatedTemplates));
+    setSaveTemplateDialogOpen(false);
+    setNewTemplateName('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -124,6 +218,22 @@ function Projects() {
               </Typography>
             )}
             <form onSubmit={handleSubmit} className={classes.form}>
+              <FormControl className={classes.templateSelect}>
+                <InputLabel>Project Template</InputLabel>
+                <Select
+                  value={selectedTemplate}
+                  onChange={handleTemplateChange}
+                >
+                  <MenuItem value="">
+                    <em>None</em>
+                  </MenuItem>
+                  {templates.map((template) => (
+                    <MenuItem key={template.id} value={template.id}>
+                      {template.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <TextField
                 fullWidth
                 label="Project Name"
@@ -145,8 +255,18 @@ function Projects() {
                 variant="contained"
                 color="primary"
                 disabled={loading}
+                style={{ marginRight: 8 }}
               >
                 {loading ? <CircularProgress size={24} /> : 'Create Project'}
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={handleSaveAsTemplate}
+                startIcon={<SaveIcon />}
+                className={classes.saveTemplateButton}
+              >
+                Save as Template
               </Button>
             </form>
           </Paper>
@@ -206,6 +326,32 @@ function Projects() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Save Template Dialog */}
+      <Dialog
+        open={saveTemplateDialogOpen}
+        onClose={() => setSaveTemplateDialogOpen(false)}
+      >
+        <DialogTitle>Save as Template</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Template Name"
+            fullWidth
+            value={newTemplateName}
+            onChange={(e) => setNewTemplateName(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveTemplateDialogOpen(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleSaveTemplate} color="primary" variant="contained">
+            Save Template
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
