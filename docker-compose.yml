@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  ui:
+    build: ./ui
+    ports:
+      - "3000:3000"
+    depends_on:
+      - orchestrator
+    networks:
+      - frontend_net
+      - backend_net
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+
+  orchestrator:
+    build: ./orchestrator
+    ports:
+      - "5000:5000"
+    depends_on:
+      - message_queue
+      - database
+    networks:
+      - frontend_net
+      - backend_net
+      - ollama_net
+    environment:
+      - DB_HOST=database
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - RABBITMQ_HOST=message_queue
+      - RABBITMQ_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_PASS=${RABBITMQ_DEFAULT_PASS}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+
+  worker_agent:
+    build: ./worker_agent
+    depends_on:
+      - message_queue
+      - database
+    deploy:
+      replicas: 3
+    networks:
+      - backend_net
+    environment:
+      - DB_HOST=database
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - RABBITMQ_HOST=message_queue
+      - RABBITMQ_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_PASS=${RABBITMQ_DEFAULT_PASS}
+
+  database:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - backend_net
+
+  message_queue:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    networks:
+      - backend_net
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - backend_net
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - backend_net
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    restart: unless-stopped
+    expose:
+      - 9100
+    networks:
+      - backend_net
+
+networks:
+  frontend_net:
+  backend_net:
+  ollama_net:
+    driver: bridge
+
+volumes:
+  db_data:
+  grafana_data: 

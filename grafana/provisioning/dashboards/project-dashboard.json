@@ -1,0 +1,27 @@
+{
+  "dashboard": {
+    "title": "Project Management Dashboard",
+    "panels": [
+      {
+        "title": "Active Tasks",
+        "type": "gauge",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "active_tasks"
+          }
+        ]
+      },
+      {
+        "title": "Projects Created",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(projects_created_total[5m])"
+          }
+        ]
+      }
+    ]
+  }
+} 

@@ -1,0 +1,42 @@
+# Environment variables
+.env
+*.env
+.env.*
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+data/
+volumes/
+
+# Temporary files
+*.tmp
+*.temp
+.coverage
+coverage/ 
