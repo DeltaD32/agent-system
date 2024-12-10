@@ -43,19 +43,33 @@ def register_agent():
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # First try to update existing agent
         cur.execute(
             '''
-            INSERT INTO worker_agents (name, status, capabilities, last_heartbeat)
-            VALUES (%s, %s, %s, NOW())
-            ON CONFLICT (name) DO UPDATE
-            SET status = EXCLUDED.status,
-                last_heartbeat = EXCLUDED.last_heartbeat
+            UPDATE worker_agents 
+            SET status = 'available',
+                last_heartbeat = NOW()
+            WHERE name = %s
             RETURNING id
             ''',
-            (WORKER_ID, 'available', json.dumps(['mistral']))
+            (WORKER_ID,)
         )
         
-        agent_id = cur.fetchone()[0]
+        result = cur.fetchone()
+        
+        if not result:
+            # If no existing agent, insert new one
+            cur.execute(
+                '''
+                INSERT INTO worker_agents (name, status, capabilities, last_heartbeat)
+                VALUES (%s, %s, %s, NOW())
+                RETURNING id
+                ''',
+                (WORKER_ID, 'available', json.dumps(['mistral']))
+            )
+            result = cur.fetchone()
+        
+        agent_id = result[0]
         conn.commit()
         cur.close()
         conn.close()

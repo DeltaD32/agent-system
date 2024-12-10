@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useHistory } from 'react-router-dom';
 import {
   Paper,
   Typography,
@@ -91,6 +92,8 @@ const useStyles = makeStyles((theme) => ({
 
 function Projects() {
   const classes = useStyles();
+  const location = useLocation();
+  const history = useHistory();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [projectName, setProjectName] = useState('');
@@ -100,14 +103,31 @@ function Projects() {
   const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
   const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   useEffect(() => {
+    // Show create form if accessed via /projects/new
+    setShowCreateForm(location.pathname === '/projects/new');
+    
     // Load templates from localStorage or use defaults
     const savedTemplates = localStorage.getItem('projectTemplates');
     if (savedTemplates) {
       setTemplates([...DEFAULT_TEMPLATES, ...JSON.parse(savedTemplates)]);
     }
-  }, []);
+
+    // Load existing projects
+    const fetchProjects = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/projects`);
+        setProjects(response.data);
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        setError('Failed to fetch projects');
+      }
+    };
+
+    fetchProjects();
+  }, [location.pathname]);
 
   const handleTemplateChange = (event) => {
     const templateId = event.target.value;
@@ -154,11 +174,18 @@ function Projects() {
       const response = await axios.post(`${API_URL}/project`, {
         name: projectName,
         description: projectDescription,
+        template_id: selectedTemplate || undefined,
       });
 
       // Clear form
       setProjectName('');
       setProjectDescription('');
+      setSelectedTemplate('');
+
+      // Redirect to projects list
+      if (location.pathname === '/projects/new') {
+        history.push('/projects');
+      }
 
       // Refresh project list
       fetchProject(response.data.project_id);
@@ -207,7 +234,7 @@ function Projects() {
   return (
     <div className={classes.root}>
       <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={showCreateForm ? 12 : 4}>
           <Paper className={classes.paper}>
             <Typography variant="h5" gutterBottom>
               Create New Project
@@ -223,6 +250,7 @@ function Projects() {
                 <Select
                   value={selectedTemplate}
                   onChange={handleTemplateChange}
+                  autoFocus={showCreateForm}
                 >
                   <MenuItem value="">
                     <em>None</em>
@@ -240,6 +268,7 @@ function Projects() {
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 required
+                autoFocus={!showCreateForm}
               />
               <TextField
                 fullWidth
@@ -250,81 +279,95 @@ function Projects() {
                 rows={4}
                 required
               />
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                disabled={loading}
-                style={{ marginRight: 8 }}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Create Project'}
-              </Button>
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={handleSaveAsTemplate}
-                startIcon={<SaveIcon />}
-                className={classes.saveTemplateButton}
-              >
-                Save as Template
-              </Button>
+              <Box display="flex" gap={1} mt={2}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={loading}
+                  className={classes.submitButton}
+                >
+                  {loading ? <CircularProgress size={24} /> : 'Create Project'}
+                </Button>
+                {!showCreateForm && (
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={handleSaveAsTemplate}
+                    startIcon={<SaveIcon />}
+                    className={classes.saveTemplateButton}
+                  >
+                    Save as Template
+                  </Button>
+                )}
+                {showCreateForm && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => history.push('/projects')}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </Box>
             </form>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={8}>
-          <Paper className={classes.paper}>
-            <Typography variant="h5" gutterBottom>
-              Projects
-            </Typography>
-            <List>
-              {projects.map((project) => (
-                <Paper key={project.project.id} className={classes.paper}>
-                  <Box display="flex" alignItems="center" marginBottom={2}>
-                    <Typography variant="h6">
-                      {project.project.name}
+        {!showCreateForm && (
+          <Grid item xs={12} md={8}>
+            <Paper className={classes.paper}>
+              <Typography variant="h5" gutterBottom>
+                Projects
+              </Typography>
+              <List>
+                {projects.map((project) => (
+                  <Paper key={project.project.id} className={classes.paper}>
+                    <Box display="flex" alignItems="center" marginBottom={2}>
+                      <Typography variant="h6">
+                        {project.project.name}
+                      </Typography>
+                      <Chip
+                        label={project.project.status}
+                        color={getStatusColor(project.project.status)}
+                        className={classes.statusChip}
+                      />
+                    </Box>
+                    <Typography variant="body1" paragraph>
+                      {project.project.description}
                     </Typography>
-                    <Chip
-                      label={project.project.status}
-                      color={getStatusColor(project.project.status)}
-                      className={classes.statusChip}
-                    />
-                  </Box>
-                  <Typography variant="body1" paragraph>
-                    {project.project.description}
-                  </Typography>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Tasks ({project.tasks.length})
-                  </Typography>
-                  <List className={classes.taskList}>
-                    {project.tasks.map((task) => (
-                      <ListItem key={task.id} divider>
-                        <ListItemText
-                          primary={task.description}
-                          secondary={
-                            <Box display="flex" alignItems="center" marginTop={1}>
-                              <Chip
-                                size="small"
-                                label={task.status}
-                                color={getStatusColor(task.status)}
-                              />
-                              {task.assigned_agent && (
+                    <Typography variant="subtitle1" gutterBottom>
+                      Tasks ({project.tasks.length})
+                    </Typography>
+                    <List className={classes.taskList}>
+                      {project.tasks.map((task) => (
+                        <ListItem key={task.id} divider>
+                          <ListItemText
+                            primary={task.description}
+                            secondary={
+                              <Box display="flex" alignItems="center" marginTop={1}>
                                 <Chip
                                   size="small"
-                                  label={`Agent: ${task.assigned_agent}`}
-                                  className={classes.chip}
+                                  label={task.status}
+                                  color={getStatusColor(task.status)}
                                 />
-                              )}
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Paper>
-              ))}
-            </List>
-          </Paper>
-        </Grid>
+                                {task.assigned_agent && (
+                                  <Chip
+                                    size="small"
+                                    label={`Agent: ${task.assigned_agent}`}
+                                    className={classes.chip}
+                                  />
+                                )}
+                              </Box>
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Paper>
+                ))}
+              </List>
+            </Paper>
+          </Grid>
+        )}
       </Grid>
 
       {/* Save Template Dialog */}

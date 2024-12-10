@@ -4,11 +4,14 @@ import pika
 import psycopg2
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Gauge, Histogram, Info, generate_latest, CONTENT_TYPE_LATEST
 import logging
 from datetime import datetime, timezone
 from auth_middleware import require_auth, token_required, create_jwt_token
 import simple_websocket
+import time
+import platform
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -28,9 +31,29 @@ ACTIVE_TASKS = Gauge('active_tasks', 'Number of active tasks')
 MISTRAL_REQUESTS = Counter('mistral_requests_total', 'Total number of requests to Mistral')
 MISTRAL_ERRORS = Counter('mistral_errors_total', 'Total number of Mistral errors')
 
+# Define Prometheus metrics
+PROJECTS_TOTAL = Gauge('project_total', 'Total number of projects')
+ACTIVE_PROJECTS = Gauge('active_projects', 'Number of active projects')
+TASKS_TOTAL = Gauge('project_tasks_total', 'Total number of tasks', ['project'])
+TASKS_BY_STATUS = Gauge('project_tasks_by_status', 'Tasks by status', ['status'])
+TASKS_BY_PRIORITY = Gauge('project_tasks_by_priority', 'Tasks by priority', ['priority'])
+PROJECT_COMPLETION = Gauge('project_completion_percentage', 'Project completion percentage', ['project'])
+TEAM_MEMBERS = Gauge('team_members_total', 'Total number of team members')
+ONLINE_MEMBERS = Gauge('team_members_online', 'Number of online team members')
+AGENT_COUNT = Gauge('ai_agents_total', 'Total number of AI agents')
+AGENT_STATUS = Gauge('ai_agents_by_status', 'AI agents by status', ['status'])
+
+# System metrics
+REQUEST_TIME = Histogram('http_request_duration_seconds', 'HTTP request duration in seconds', ['endpoint'])
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
+SYSTEM_INFO = Info('system_version', 'System version information')
+
 # Default admin credentials
 ADMIN_USERNAME = 'admin'
 ADMIN_PASSWORD = 'adminadmin'
+
+# Global variables
+active_connections = set()
 
 def get_db_connection():
     """Get database connection"""
@@ -41,78 +64,50 @@ def get_db_connection():
         password=os.environ.get('DB_PASSWORD', 'projectpass')
     )
 
-@app.route('/api/login', methods=['POST'])
-def login():
-    """Login endpoint to get JWT token"""
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-    
-    if not username or not password:
-        return jsonify({'error': 'Username and password are required'}), 400
-    
-    # Check against default admin credentials
-    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-        token = create_jwt_token(username)
-        return jsonify({'token': token}), 200
-    
-    return jsonify({'error': 'Invalid credentials'}), 401
-
 @app.route('/health')
 def health():
     """Health check endpoint"""
-    try:
-        # Check database
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute('SELECT 1')
-        cur.close()
-        conn.close()
-        db_status = 'healthy'
-    except Exception:
-        db_status = 'unhealthy'
-    
-    # Check RabbitMQ
-    try:
-        credentials = pika.PlainCredentials(
-            os.environ.get('RABBITMQ_USER', 'guest'),
-            os.environ.get('RABBITMQ_PASS', 'guest')
-        )
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(
-                host=os.environ.get('RABBITMQ_HOST', 'message_queue'),
-                credentials=credentials
-            )
-        )
-        connection.close()
-        mq_status = 'healthy'
-    except Exception:
-        mq_status = 'unhealthy'
-    
-    # Get metrics
-    metrics = {
-        'active_tasks': ACTIVE_TASKS._value.get(),
-        'mistral_requests': MISTRAL_REQUESTS._value.get(),
-        'mistral_errors': MISTRAL_ERRORS._value.get(),
-    }
-    
     return jsonify({
+        'status': 'healthy',
         'components': {
-            'database': db_status,
-            'message_queue': mq_status,
-            'ollama': 'healthy',  # Assuming Ollama is always available
+            'database': check_database_health(),
+            'message_queue': check_message_queue_health(),
+            'ollama': check_ollama_health(),
             'websocket': {
                 'status': 'healthy',
-                'connections': 0  # TODO: Track actual connections
+                'connections': get_websocket_connections()
             }
-        },
-        'metrics': metrics
+        }
     })
 
 @app.route('/metrics')
 def metrics():
     """Prometheus metrics endpoint"""
     return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+# Add metrics middleware
+@app.before_request
+def before_request():
+    request.start_time = time.time()
+
+@app.after_request
+def after_request(response):
+    if hasattr(request, 'start_time'):
+        request_latency = time.time() - request.start_time
+        REQUEST_TIME.labels(endpoint=request.endpoint).observe(request_latency)
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.endpoint or 'unknown',
+            status=response.status_code
+        ).inc()
+    return response
+
+# Update system info
+SYSTEM_INFO.info({
+    'version': '1.0.0',
+    'python_version': platform.python_version(),
+    'platform': platform.platform()
+})
 
 @app.route('/api/agents', methods=['GET'])
 @require_auth
@@ -314,6 +309,194 @@ def get_task(task_id):
     finally:
         cur.close()
         conn.close()
+
+@app.route('/api/projects', methods=['GET'])
+@require_auth
+def list_projects():
+    """List all projects"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM projects ORDER BY created_at DESC')
+            projects = cur.fetchall()
+            
+            # Format projects
+            formatted_projects = []
+            for project in projects:
+                # Get tasks for this project
+                cur.execute('SELECT * FROM tasks WHERE project_id = %s', (project[0],))
+                tasks = cur.fetchall()
+                
+                formatted_projects.append({
+                    'project': {
+                        'id': project[0],
+                        'name': project[1],
+                        'description': project[2],
+                        'status': project[3],
+                        'created_at': project[4].isoformat(),
+                        'updated_at': project[5].isoformat(),
+                    },
+                    'tasks': [
+                        {
+                            'id': task[0],
+                            'description': task[2],
+                            'status': task[3],
+                            'assigned_agent': task[4],
+                        }
+                        for task in tasks
+                    ]
+                })
+            
+            return jsonify(formatted_projects)
+    except Exception as e:
+        app.logger.error(f"Error listing projects: {str(e)}")
+        return jsonify({'error': 'Failed to list projects'}), 500
+
+@app.route('/api/projects', methods=['POST'])
+@require_auth
+def create_project():
+    """Create a new project"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'name' not in data:
+            return jsonify({'error': 'Project name is required'}), 400
+        
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            
+            # Insert project
+            cur.execute(
+                'INSERT INTO projects (name, description, status) VALUES (%s, %s, %s) RETURNING id',
+                (data['name'], data.get('description', ''), 'pending')
+            )
+            project_id = cur.fetchone()[0]
+            
+            # If template is specified, create tasks from template
+            if 'template_id' in data:
+                template = get_template_by_id(data['template_id'])
+                if template and template.get('tasks'):
+                    for task in template['tasks']:
+                        cur.execute(
+                            'INSERT INTO tasks (project_id, description, status) VALUES (%s, %s, %s)',
+                            (project_id, task['description'], 'pending')
+                        )
+            
+            conn.commit()
+            
+            return jsonify({
+                'message': 'Project created successfully',
+                'project_id': project_id
+            }), 201
+            
+    except Exception as e:
+        app.logger.error(f"Error creating project: {str(e)}")
+        return jsonify({'error': 'Failed to create project'}), 500
+
+@app.route('/api/projects/<int:project_id>', methods=['GET'])
+@require_auth
+def get_project(project_id):
+    """Get project details"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            
+            # Get project
+            cur.execute('SELECT * FROM projects WHERE id = %s', (project_id,))
+            project = cur.fetchone()
+            
+            if not project:
+                return jsonify({'error': 'Project not found'}), 404
+            
+            # Get tasks
+            cur.execute('SELECT * FROM tasks WHERE project_id = %s', (project_id,))
+            tasks = cur.fetchall()
+            
+            return jsonify({
+                'project': {
+                    'id': project[0],
+                    'name': project[1],
+                    'description': project[2],
+                    'status': project[3],
+                    'created_at': project[4].isoformat(),
+                    'updated_at': project[5].isoformat(),
+                },
+                'tasks': [
+                    {
+                        'id': task[0],
+                        'description': task[2],
+                        'status': task[3],
+                        'assigned_agent': task[4],
+                    }
+                    for task in tasks
+                ]
+            })
+    except Exception as e:
+        app.logger.error(f"Error getting project: {str(e)}")
+        return jsonify({'error': 'Failed to get project'}), 500
+
+def check_database_health():
+    """Check database health"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute('SELECT 1')
+            cur.close()
+            return 'healthy'
+    except Exception as e:
+        app.logger.error(f"Database health check failed: {str(e)}")
+        return 'unhealthy'
+
+def check_message_queue_health():
+    """Check RabbitMQ health"""
+    try:
+        credentials = pika.PlainCredentials(
+            os.environ.get('RABBITMQ_USER', 'guest'),
+            os.environ.get('RABBITMQ_PASS', 'guest')
+        )
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(
+                host=os.environ.get('RABBITMQ_HOST', 'message_queue'),
+                credentials=credentials
+            )
+        )
+        connection.close()
+        return 'healthy'
+    except Exception as e:
+        app.logger.error(f"Message queue health check failed: {str(e)}")
+        return 'unhealthy'
+
+def check_ollama_health():
+    """Check Ollama health"""
+    try:
+        response = requests.get('http://ollama:11434/api/health')
+        if response.status_code == 200:
+            return 'healthy'
+        return 'unhealthy'
+    except Exception as e:
+        app.logger.error(f"Ollama health check failed: {str(e)}")
+        return 'unhealthy'
+
+def get_websocket_connections():
+    """Get current WebSocket connections count"""
+    return len(active_connections)
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """Login endpoint"""
+    data = request.get_json()
+    
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({'error': 'Username and password are required'}), 400
+    
+    if data['username'] == ADMIN_USERNAME and data['password'] == ADMIN_PASSWORD:
+        token = create_jwt_token(data['username'])
+        return jsonify({
+            'token': token,
+            'username': data['username']
+        })
+    
+    return jsonify({'error': 'Invalid credentials'}), 401
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000) 

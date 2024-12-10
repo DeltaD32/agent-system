@@ -5,155 +5,223 @@ import {
   Typography,
   makeStyles,
   CircularProgress,
-  Chip,
-  Button,
+  LinearProgress,
+  Box,
 } from '@material-ui/core';
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-} from '@material-ui/icons';
+import axios from 'axios';
 
 const useStyles = makeStyles((theme) => ({
   root: {
-    width: '100%',
+    flexGrow: 1,
   },
-  header: {
+  paper: {
+    padding: theme.spacing(2),
+    height: '100%',
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    background: theme.palette.background.paper,
+  },
+  title: {
     marginBottom: theme.spacing(2),
   },
-  statusItem: {
-    padding: theme.spacing(2),
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: theme.palette.background.default,
+  metric: {
+    marginBottom: theme.spacing(2),
+  },
+  progress: {
+    marginTop: theme.spacing(1),
   },
   loading: {
     display: 'flex',
     justifyContent: 'center',
-    padding: theme.spacing(3),
+    alignItems: 'center',
+    minHeight: 200,
   },
   error: {
+    color: theme.palette.error.main,
+    textAlign: 'center',
     padding: theme.spacing(2),
-    backgroundColor: theme.palette.error.light,
-    color: theme.palette.error.contrastText,
-    marginBottom: theme.spacing(2),
-  },
-  refreshButton: {
-    marginLeft: theme.spacing(2),
   },
 }));
 
 function SystemStatus() {
   const classes = useStyles();
-  const [status, setStatus] = useState(null);
+  const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchStatus = async () => {
+  const fetchMetrics = async () => {
     try {
-      console.log('Fetching system status...');
-      setLoading(true);
-      setError(null);
+      const response = await axios.get('/api/metrics');
+      const metricsText = response.data;
+      
+      // Parse Prometheus metrics
+      const parsedMetrics = {
+        projects: {
+          total: 0,
+          active: 0,
+        },
+        tasks: {
+          total: 0,
+          byStatus: {},
+          byPriority: {},
+        },
+        agents: {
+          total: 0,
+          byStatus: {},
+        },
+        system: {
+          requestRate: 0,
+          errorRate: 0,
+          avgResponseTime: 0,
+        },
+      };
 
-      const response = await fetch('/api/health', {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
+      // Parse metrics text
+      metricsText.split('\n').forEach(line => {
+        if (line.startsWith('#')) return;
+        
+        if (line.includes('project_total')) {
+          parsedMetrics.projects.total = parseFloat(line.split(' ')[1]);
+        }
+        else if (line.includes('active_projects')) {
+          parsedMetrics.projects.active = parseFloat(line.split(' ')[1]);
+        }
+        else if (line.includes('project_tasks_total')) {
+          parsedMetrics.tasks.total += parseFloat(line.split(' ')[1]);
+        }
+        else if (line.includes('project_tasks_by_status')) {
+          const match = line.match(/status="([^"]+)"\s+(\d+)/);
+          if (match) {
+            parsedMetrics.tasks.byStatus[match[1]] = parseFloat(match[2]);
+          }
+        }
+        else if (line.includes('ai_agents_total')) {
+          parsedMetrics.agents.total = parseFloat(line.split(' ')[1]);
+        }
+        else if (line.includes('ai_agents_by_status')) {
+          const match = line.match(/status="([^"]+)"\s+(\d+)/);
+          if (match) {
+            parsedMetrics.agents.byStatus[match[1]] = parseFloat(match[2]);
+          }
+        }
+        else if (line.includes('http_request_duration_seconds_sum')) {
+          const value = parseFloat(line.split(' ')[1]);
+          parsedMetrics.system.avgResponseTime = value;
+        }
+        else if (line.includes('http_requests_total')) {
+          const value = parseFloat(line.split(' ')[1]);
+          parsedMetrics.system.requestRate = value;
         }
       });
 
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`Failed to fetch system status: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Received status data:', data);
-      setStatus(data);
+      setMetrics(parsedMetrics);
+      setLoading(false);
     } catch (err) {
-      console.error('Error fetching system status:', err);
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    console.log('SystemStatus component mounted');
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 30000);
-    return () => {
-      console.log('SystemStatus component unmounting');
-      clearInterval(interval);
-    };
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
   }, []);
 
-  const handleRefresh = () => {
-    console.log('Manual refresh requested');
-    fetchStatus();
-  };
+  if (loading) {
+    return (
+      <div className={classes.loading}>
+        <CircularProgress />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Typography variant="h6" className={classes.error}>
+        Error loading system status: {error}
+      </Typography>
+    );
+  }
 
   return (
     <div className={classes.root}>
-      <div className={classes.header}>
-        <Typography variant="h6">
-          System Status
-        </Typography>
-        <Button
-          variant="outlined"
-          color="primary"
-          startIcon={<RefreshIcon />}
-          onClick={handleRefresh}
-          disabled={loading}
-        >
-          Refresh
-        </Button>
-      </div>
-
-      {error && (
-        <Paper className={classes.error}>
-          <Typography>
-            {error}
-          </Typography>
-        </Paper>
-      )}
-
-      {loading ? (
-        <div className={classes.loading}>
-          <CircularProgress />
-        </div>
-      ) : (
-        <Grid container spacing={2}>
-          {status && status.components && Object.entries(status.components).map(([key, value]) => {
-            // Handle both string and object values
-            const status = typeof value === 'object' ? value.status : value;
-            const label = typeof value === 'object' ? `${status} (${value.connections} connections)` : value;
-            
-            return (
-              <Grid item xs={12} sm={6} md={4} key={key}>
-                <Paper className={classes.statusItem} elevation={2}>
-                  <Typography variant="subtitle1">
-                    {key.charAt(0).toUpperCase() + key.slice(1)}
-                  </Typography>
-                  <Chip
-                    icon={status === 'healthy' ? <CheckCircleIcon /> : <ErrorIcon />}
-                    label={label}
-                    color={status === 'healthy' ? 'primary' : 'secondary'}
-                    variant="outlined"
-                  />
-                </Paper>
-              </Grid>
-            );
-          })}
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Paper className={classes.paper}>
+            <Typography variant="h6" className={classes.title}>
+              Projects & Tasks
+            </Typography>
+            <div className={classes.metric}>
+              <Typography variant="subtitle1">
+                Active Projects: {metrics.projects.active} / {metrics.projects.total}
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={(metrics.projects.active / metrics.projects.total) * 100}
+                className={classes.progress}
+              />
+            </div>
+            <div className={classes.metric}>
+              <Typography variant="subtitle1">
+                Total Tasks: {metrics.tasks.total}
+              </Typography>
+              <Box mt={1}>
+                {Object.entries(metrics.tasks.byStatus).map(([status, count]) => (
+                  <div key={status}>
+                    <Typography variant="body2">
+                      {status}: {count}
+                    </Typography>
+                    <LinearProgress
+                      variant="determinate"
+                      value={(count / metrics.tasks.total) * 100}
+                      className={classes.progress}
+                    />
+                  </div>
+                ))}
+              </Box>
+            </div>
+          </Paper>
         </Grid>
-      )}
+
+        <Grid item xs={12} md={6}>
+          <Paper className={classes.paper}>
+            <Typography variant="h6" className={classes.title}>
+              System Performance
+            </Typography>
+            <div className={classes.metric}>
+              <Typography variant="subtitle1">
+                Request Rate: {metrics.system.requestRate.toFixed(2)} req/s
+              </Typography>
+              <Typography variant="subtitle1">
+                Avg Response Time: {metrics.system.avgResponseTime.toFixed(2)} ms
+              </Typography>
+            </div>
+            <Typography variant="h6" className={classes.title} style={{ marginTop: 16 }}>
+              Agent Status
+            </Typography>
+            <div className={classes.metric}>
+              <Typography variant="subtitle1">
+                Total Agents: {metrics.agents.total}
+              </Typography>
+              <Box mt={1}>
+                {Object.entries(metrics.agents.byStatus).map(([status, count]) => (
+                  <div key={status}>
+                    <Typography variant="body2">
+                      {status}: {count}
+                    </Typography>
+                    <LinearProgress
+                      variant="determinate"
+                      value={(count / metrics.agents.total) * 100}
+                      className={classes.progress}
+                    />
+                  </div>
+                ))}
+              </Box>
+            </div>
+          </Paper>
+        </Grid>
+      </Grid>
     </div>
   );
 }

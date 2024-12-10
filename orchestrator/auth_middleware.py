@@ -17,7 +17,7 @@ def create_jwt_token(username):
     }
     return jwt.encode(payload, JWT_SECRET, algorithm='HS256')
 
-def token_required(f):
+def require_auth(f):
     """Decorator to protect routes with JWT token"""
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -32,27 +32,20 @@ def token_required(f):
                 return jsonify({'error': 'Token is missing'}), 401
         
         if not token:
-            return jsonify({'error': 'Token is missing'}), 401
+            return jsonify({'error': 'Authentication required'}), 401
         
         try:
             # Verify token
             data = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
             current_user = data['username']
+            return f(*args, **kwargs)
         except jwt.ExpiredSignatureError:
             return jsonify({'error': 'Token has expired'}), 401
         except jwt.InvalidTokenError:
             return jsonify({'error': 'Token is invalid'}), 401
-        
-        return f(current_user, *args, **kwargs)
     
     return decorated
 
-def require_auth(f):
-    """Legacy decorator for basic auth - keeping for backward compatibility"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth:
-            return jsonify({'error': 'Authentication required'}), 401
-        return f(*args, **kwargs)
-    return decorated
+def token_required(f):
+    """Legacy decorator for token auth - keeping for backward compatibility"""
+    return require_auth(f)
