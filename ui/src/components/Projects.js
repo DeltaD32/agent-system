@@ -1,34 +1,136 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useHistory } from 'react-router-dom';
+import { useLocation, useHistory, useParams } from 'react-router-dom';
 import {
-  Paper,
+  Container,
   Typography,
   TextField,
   Button,
   Grid,
-  List,
-  ListItem,
-  ListItemText,
   CircularProgress,
-  Chip,
   Box,
   makeStyles,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
+  Snackbar,
+  Card,
+  CardContent,
+  CardActions,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  IconButton,
+  Divider,
+  Paper,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Tooltip,
 } from '@material-ui/core';
+import { Alert } from '@material-ui/lab';
 import {
   Add as AddIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  ArrowBack as ArrowBackIcon,
   Save as SaveIcon,
+  Cancel as CancelIcon,
+  Assignment as ProjectIcon,
+  Refresh as RefreshIcon,
 } from '@material-ui/icons';
 import axios from 'axios';
+import { useNotification } from '../context/NotificationContext';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const useStyles = makeStyles((theme) => ({
+  root: {
+    flexGrow: 1,
+    padding: theme.spacing(3),
+    backgroundColor: theme.palette.background.default,
+  },
+  header: {
+    marginBottom: theme.spacing(4),
+    padding: theme.spacing(4),
+    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+    color: theme.palette.primary.contrastText,
+    borderRadius: theme.shape.borderRadius * 2,
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    marginTop: theme.spacing(2),
+  },
+  backButton: {
+    marginRight: theme.spacing(2),
+  },
+  paper: {
+    padding: theme.spacing(3),
+    marginBottom: theme.spacing(3),
+    borderRadius: theme.shape.borderRadius,
+    transition: 'transform 0.2s, box-shadow 0.2s',
+    '&:hover': {
+      transform: 'translateY(-4px)',
+      boxShadow: theme.shadows[4],
+    },
+  },
+  form: {
+    '& .MuiTextField-root': {
+      marginBottom: theme.spacing(2),
+    },
+  },
+  templateSelect: {
+    marginBottom: theme.spacing(2),
+    minWidth: '100%',
+  },
+  submitButton: {
+    marginTop: theme.spacing(2),
+    borderRadius: theme.shape.borderRadius * 2,
+    padding: theme.spacing(1, 3),
+  },
+  projectCard: {
+    height: '100%',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+    '&:hover': {
+      transform: 'translateY(-4px)',
+      boxShadow: theme.shadows[4],
+    },
+  },
+  projectIcon: {
+    fontSize: 40,
+    color: theme.palette.primary.main,
+    marginBottom: theme.spacing(2),
+  },
+  deleteButton: {
+    color: theme.palette.error.main,
+  },
+  detailsSection: {
+    marginTop: theme.spacing(3),
+  },
+  detailsHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing(2),
+  },
+  taskList: {
+    marginTop: theme.spacing(2),
+  },
+  taskItem: {
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(1),
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+    },
+  },
+  editField: {
+    marginBottom: theme.spacing(2),
+  },
+  statusChip: {
+    margin: theme.spacing(0, 1),
+  },
+}));
 
 const DEFAULT_TEMPLATES = [
   {
@@ -57,77 +159,75 @@ const DEFAULT_TEMPLATES = [
   },
 ];
 
-const useStyles = makeStyles((theme) => ({
-  root: {
-    flexGrow: 1,
-  },
-  paper: {
-    padding: theme.spacing(3),
-    marginBottom: theme.spacing(3),
-  },
-  form: {
-    '& .MuiTextField-root': {
-      marginBottom: theme.spacing(2),
-    },
-  },
-  chip: {
-    margin: theme.spacing(0.5),
-  },
-  taskList: {
-    maxHeight: '300px',
-    overflow: 'auto',
-    marginTop: theme.spacing(2),
-  },
-  statusChip: {
-    marginLeft: theme.spacing(1),
-  },
-  templateSelect: {
-    marginBottom: theme.spacing(2),
-    minWidth: '100%',
-  },
-  saveTemplateButton: {
-    marginTop: theme.spacing(2),
-  },
-}));
-
 function Projects() {
   const classes = useStyles();
   const location = useLocation();
   const history = useHistory();
-  const [projects, setProjects] = useState([]);
+  const { id } = useParams();
+  const { showNotification } = useNotification();
   const [loading, setLoading] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [error, setError] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
-  const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [templates] = useState(DEFAULT_TEMPLATES);
+  const [projects, setProjects] = useState([]);
+  const [currentProject, setCurrentProject] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editedProject, setEditedProject] = useState({
+    name: '',
+    description: '',
+  });
 
   useEffect(() => {
-    // Show create form if accessed via /projects/new
-    setShowCreateForm(location.pathname === '/projects/new');
-    
-    // Load templates from localStorage or use defaults
-    const savedTemplates = localStorage.getItem('projectTemplates');
-    if (savedTemplates) {
-      setTemplates([...DEFAULT_TEMPLATES, ...JSON.parse(savedTemplates)]);
+    if (location.pathname === '/projects') {
+      fetchProjects();
+    } else if (id) {
+      fetchProjectDetails(id);
     }
+  }, [location.pathname, id]);
 
-    // Load existing projects
-    const fetchProjects = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/projects`);
-        setProjects(response.data);
-      } catch (error) {
-        console.error('Error fetching projects:', error);
-        setError('Failed to fetch projects');
-      }
-    };
+  const fetchProjects = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await axios.get('/api/projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setProjects(response.data);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      showNotification('Failed to fetch projects', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchProjects();
-  }, [location.pathname]);
+  const fetchProjectDetails = async (projectId) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await axios.get(`/api/projects/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setCurrentProject(response.data);
+      setEditedProject({
+        name: response.data.name,
+        description: response.data.description,
+      });
+    } catch (error) {
+      console.error('Error fetching project details:', error);
+      showNotification('Failed to fetch project details', 'error');
+      history.push('/projects');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleTemplateChange = (event) => {
     const templateId = event.target.value;
@@ -142,260 +242,351 @@ function Projects() {
     }
   };
 
-  const handleSaveAsTemplate = () => {
-    if (!projectName || !projectDescription) {
-      setError('Please fill in project details before saving as template');
-      return;
-    }
-    setSaveTemplateDialogOpen(true);
-  };
-
-  const handleSaveTemplate = () => {
-    const newTemplate = {
-      id: `template-${Date.now()}`,
-      name: newTemplateName,
-      description: projectDescription,
-      tasks: [],
-    };
-
-    const updatedTemplates = [...templates, newTemplate];
-    setTemplates(updatedTemplates);
-    localStorage.setItem('projectTemplates', JSON.stringify(updatedTemplates));
-    setSaveTemplateDialogOpen(false);
-    setNewTemplateName('');
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!projectName.trim()) {
+      setError('Project name is required');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      const response = await axios.post(`${API_URL}/project`, {
-        name: projectName,
-        description: projectDescription,
-        template_id: selectedTemplate || undefined,
-      });
+      const token = localStorage.getItem('auth_token');
+      const projectData = {
+        name: projectName.trim(),
+        description: projectDescription.trim(),
+        template_id: selectedTemplate || undefined
+      };
 
+      const response = await axios.post('/api/projects', projectData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      showNotification('Project created successfully', 'success');
+      
       // Clear form
       setProjectName('');
       setProjectDescription('');
       setSelectedTemplate('');
-
+      
       // Redirect to projects list
-      if (location.pathname === '/projects/new') {
-        history.push('/projects');
-      }
-
-      // Refresh project list
-      fetchProject(response.data.project_id);
+      history.push('/projects');
     } catch (error) {
       console.error('Error creating project:', error);
-      setError('Failed to create project. Please try again.');
+      if (error.response?.status === 401) {
+        showNotification('Please log in to create a project', 'error');
+        history.push('/login');
+      } else {
+        setError(error.response?.data?.error || 'Failed to create project. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchProject = async (projectId) => {
+  const handleUpdateProject = async () => {
     try {
-      const response = await axios.get(`${API_URL}/project/${projectId}`);
-      setProjects(prev => {
-        const newProjects = [...prev];
-        const index = newProjects.findIndex(p => p.project.id === projectId);
-        if (index !== -1) {
-          newProjects[index] = response.data;
-        } else {
-          newProjects.unshift(response.data);
+      const token = localStorage.getItem('auth_token');
+      await axios.put(`/api/projects/${currentProject.id}`, editedProject, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         }
-        return newProjects;
       });
+      showNotification('Project updated successfully', 'success');
+      setIsEditing(false);
+      fetchProjectDetails(currentProject.id);
     } catch (error) {
-      console.error('Error fetching project:', error);
-      setError('Failed to fetch project details.');
+      console.error('Error updating project:', error);
+      showNotification('Failed to update project', 'error');
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'primary';
-      case 'pending':
-        return 'default';
-      case 'in_progress':
-        return 'secondary';
-      case 'failed':
-        return 'error';
-      default:
-        return 'default';
+  const handleDeleteProject = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      await axios.delete(`/api/projects/${currentProject.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      showNotification('Project deleted successfully', 'success');
+      setDeleteDialogOpen(false);
+      history.push('/projects');
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      showNotification(error.response?.data?.error || 'Failed to delete project', 'error');
     }
   };
 
-  return (
-    <div className={classes.root}>
+  const renderProjectsList = () => (
+    <>
+      <Box className={classes.header}>
+        <Typography variant="h4" gutterBottom>
+          Projects
+        </Typography>
+        <Typography variant="subtitle1" paragraph>
+          Manage and monitor your AI-powered projects
+        </Typography>
+        <Button
+          variant="contained"
+          color="secondary"
+          startIcon={<AddIcon />}
+          onClick={() => history.push('/projects/new')}
+          className={classes.submitButton}
+        >
+          Create New Project
+        </Button>
+      </Box>
+
       <Grid container spacing={3}>
-        <Grid item xs={12} md={showCreateForm ? 12 : 4}>
-          <Paper className={classes.paper}>
-            <Typography variant="h5" gutterBottom>
-              Create New Project
-            </Typography>
-            {error && (
-              <Typography color="error" gutterBottom>
-                {error}
-              </Typography>
-            )}
-            <form onSubmit={handleSubmit} className={classes.form}>
-              <FormControl className={classes.templateSelect}>
-                <InputLabel>Project Template</InputLabel>
-                <Select
-                  value={selectedTemplate}
-                  onChange={handleTemplateChange}
-                  autoFocus={showCreateForm}
-                >
-                  <MenuItem value="">
-                    <em>None</em>
-                  </MenuItem>
-                  {templates.map((template) => (
-                    <MenuItem key={template.id} value={template.id}>
-                      {template.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                fullWidth
-                label="Project Name"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                required
-                autoFocus={!showCreateForm}
-              />
-              <TextField
-                fullWidth
-                label="Project Description"
-                value={projectDescription}
-                onChange={(e) => setProjectDescription(e.target.value)}
-                multiline
-                rows={4}
-                required
-              />
-              <Box display="flex" gap={1} mt={2}>
+        {projects.map((project) => (
+          <Grid item xs={12} sm={6} md={4} key={project.id}>
+            <Card className={classes.projectCard}>
+              <CardContent>
+                <ProjectIcon className={classes.projectIcon} />
+                <Typography variant="h6" gutterBottom>
+                  {project.name}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {project.description}
+                </Typography>
+              </CardContent>
+              <CardActions>
                 <Button
-                  type="submit"
-                  variant="contained"
+                  size="small"
                   color="primary"
-                  disabled={loading}
-                  className={classes.submitButton}
+                  onClick={() => history.push(`/projects/${project.id}`)}
                 >
-                  {loading ? <CircularProgress size={24} /> : 'Create Project'}
+                  View Details
                 </Button>
-                {!showCreateForm && (
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    onClick={handleSaveAsTemplate}
-                    startIcon={<SaveIcon />}
-                    className={classes.saveTemplateButton}
-                  >
-                    Save as Template
-                  </Button>
-                )}
-                {showCreateForm && (
-                  <Button
-                    variant="outlined"
-                    onClick={() => history.push('/projects')}
-                  >
-                    Cancel
-                  </Button>
-                )}
+              </CardActions>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </>
+  );
+
+  const renderProjectDetails = () => (
+    <>
+      <Box className={classes.header}>
+        <Box className={classes.headerActions}>
+          <IconButton
+            color="inherit"
+            onClick={() => history.push('/projects')}
+            className={classes.backButton}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h4">
+            {isEditing ? 'Edit Project' : currentProject?.name}
+          </Typography>
+        </Box>
+      </Box>
+
+      <Paper className={classes.paper}>
+        {isEditing ? (
+          <form className={classes.form}>
+            <TextField
+              fullWidth
+              label="Project Name"
+              value={editedProject.name}
+              onChange={(e) => setEditedProject({ ...editedProject, name: e.target.value })}
+              className={classes.editField}
+            />
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label="Project Description"
+              value={editedProject.description}
+              onChange={(e) => setEditedProject({ ...editedProject, description: e.target.value })}
+              className={classes.editField}
+            />
+            <Box display="flex" justifyContent="flex-end">
+              <Button
+                startIcon={<CancelIcon />}
+                onClick={() => setIsEditing(false)}
+                style={{ marginRight: 8 }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<SaveIcon />}
+                onClick={handleUpdateProject}
+              >
+                Save Changes
+              </Button>
+            </Box>
+          </form>
+        ) : (
+          <>
+            <Box className={classes.detailsHeader}>
+              <Typography variant="h6">Project Details</Typography>
+              <Box>
+                <IconButton onClick={() => setIsEditing(true)}>
+                  <EditIcon />
+                </IconButton>
+                <IconButton
+                  className={classes.deleteButton}
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <DeleteIcon />
+                </IconButton>
               </Box>
-            </form>
-          </Paper>
-        </Grid>
-        {!showCreateForm && (
-          <Grid item xs={12} md={8}>
-            <Paper className={classes.paper}>
-              <Typography variant="h5" gutterBottom>
-                Projects
+            </Box>
+            <Divider />
+            <Box mt={2}>
+              <Typography variant="body1" paragraph>
+                {currentProject?.description}
               </Typography>
-              <List>
-                {projects.map((project) => (
-                  <Paper key={project.project.id} className={classes.paper}>
-                    <Box display="flex" alignItems="center" marginBottom={2}>
-                      <Typography variant="h6">
-                        {project.project.name}
-                      </Typography>
-                      <Chip
-                        label={project.project.status}
-                        color={getStatusColor(project.project.status)}
-                        className={classes.statusChip}
-                      />
-                    </Box>
-                    <Typography variant="body1" paragraph>
-                      {project.project.description}
-                    </Typography>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Tasks ({project.tasks.length})
-                    </Typography>
-                    <List className={classes.taskList}>
-                      {project.tasks.map((task) => (
-                        <ListItem key={task.id} divider>
-                          <ListItemText
-                            primary={task.description}
-                            secondary={
-                              <Box display="flex" alignItems="center" marginTop={1}>
-                                <Chip
-                                  size="small"
-                                  label={task.status}
-                                  color={getStatusColor(task.status)}
-                                />
-                                {task.assigned_agent && (
-                                  <Chip
-                                    size="small"
-                                    label={`Agent: ${task.assigned_agent}`}
-                                    className={classes.chip}
-                                  />
-                                )}
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Paper>
+            </Box>
+            <Box className={classes.detailsSection}>
+              <Typography variant="h6" gutterBottom>
+                Tasks
+              </Typography>
+              <List className={classes.taskList}>
+                {currentProject?.tasks?.map((task, index) => (
+                  <ListItem key={index} className={classes.taskItem}>
+                    <ListItemText
+                      primary={task.description}
+                      secondary={`Status: ${task.status}`}
+                    />
+                    <ListItemSecondaryAction>
+                      <IconButton edge="end" size="small">
+                        <EditIcon />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
                 ))}
               </List>
-            </Paper>
-          </Grid>
+            </Box>
+          </>
         )}
-      </Grid>
+      </Paper>
+    </>
+  );
 
-      {/* Save Template Dialog */}
-      <Dialog
-        open={saveTemplateDialogOpen}
-        onClose={() => setSaveTemplateDialogOpen(false)}
-      >
-        <DialogTitle>Save as Template</DialogTitle>
-        <DialogContent>
+  const renderNewProjectForm = () => (
+    <>
+      <Box className={classes.header}>
+        <Box className={classes.headerActions}>
+          <IconButton
+            color="inherit"
+            onClick={() => history.push('/projects')}
+            className={classes.backButton}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h4">Create New Project</Typography>
+        </Box>
+        <Typography variant="subtitle1" paragraph>
+          Start a new AI-powered project with our templates
+        </Typography>
+      </Box>
+
+      <Paper className={classes.paper}>
+        <form onSubmit={handleSubmit} className={classes.form}>
+          <FormControl className={classes.templateSelect}>
+            <InputLabel>Project Template</InputLabel>
+            <Select
+              value={selectedTemplate}
+              onChange={handleTemplateChange}
+              disabled={loading}
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              {templates.map((template) => (
+                <MenuItem key={template.id} value={template.id}>
+                  {template.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
           <TextField
-            autoFocus
-            margin="dense"
-            label="Template Name"
             fullWidth
-            value={newTemplateName}
-            onChange={(e) => setNewTemplateName(e.target.value)}
+            required
+            label="Project Name"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            disabled={loading}
+            error={!projectName && error}
+            helperText={!projectName && error ? 'Project name is required' : ''}
           />
+          
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Project Description"
+            value={projectDescription}
+            onChange={(e) => setProjectDescription(e.target.value)}
+            disabled={loading}
+          />
+          
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            fullWidth
+            className={classes.submitButton}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : <AddIcon />}
+          >
+            {loading ? 'Creating Project...' : 'Create Project'}
+          </Button>
+        </form>
+      </Paper>
+    </>
+  );
+
+  return (
+    <Container maxWidth="lg" className={classes.root}>
+      {location.pathname === '/projects' && renderProjectsList()}
+      {location.pathname === '/projects/new' && renderNewProjectForm()}
+      {id && renderProjectDetails()}
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>Delete Project</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this project? This action cannot be undone.
+          </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSaveTemplateDialogOpen(false)} color="primary">
+          <Button onClick={() => setDeleteDialogOpen(false)} color="primary">
             Cancel
           </Button>
-          <Button onClick={handleSaveTemplate} color="primary" variant="contained">
-            Save Template
+          <Button onClick={handleDeleteProject} color="secondary">
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setError('')} severity="error">
+          {error}
+        </Alert>
+      </Snackbar>
+    </Container>
   );
 }
 

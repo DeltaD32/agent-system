@@ -5,35 +5,27 @@ import {
   Paper, 
   Typography, 
   makeStyles, 
-  Card, 
-  CardContent,
-  CardActions,
   Button,
   Box,
   IconButton,
   Tooltip,
-  Divider,
-  Menu,
-  MenuItem,
+  LinearProgress,
+  Avatar,
+  Chip,
 } from '@material-ui/core';
 import {
   Add as AddIcon,
   Assignment as ProjectIcon,
-  Group as TeamIcon,
   Timeline as MetricsIcon,
   Code as AIIcon,
-  Security as SecurityIcon,
-  Build as ToolsIcon,
-  MoreVert as MoreVertIcon,
-  Dashboard as DashboardIcon,
-  Storage as DatabaseIcon,
   Speed as PerformanceIcon,
-  BugReport as BugIcon,
   CloudQueue as CloudIcon,
   Settings as SettingsIcon,
+  Refresh as RefreshIcon,
 } from '@material-ui/icons';
 import { useHistory } from 'react-router-dom';
 import SystemStatus from './SystemStatus';
+import useSystemStats from '../hooks/useSystemStats';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -43,111 +35,107 @@ const useStyles = makeStyles((theme) => ({
   },
   welcomeSection: {
     marginBottom: theme.spacing(4),
-    padding: theme.spacing(3),
-    background: `linear-gradient(45deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.light} 90%)`,
+    padding: theme.spacing(4),
+    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
     color: theme.palette.primary.contrastText,
-    borderRadius: theme.shape.borderRadius,
-  },
-  shortcutCard: {
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    cursor: 'pointer',
-    '&:hover': {
-      transform: 'translateY(-4px)',
-      boxShadow: theme.shadows[8],
+    borderRadius: theme.shape.borderRadius * 2,
+    position: 'relative',
+    overflow: 'hidden',
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      background: 'linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
+      zIndex: 1,
     },
   },
-  shortcutIcon: {
-    fontSize: '2.5rem',
-    marginBottom: theme.spacing(2),
-    color: theme.palette.primary.main,
-  },
-  dashboardWidget: {
+  statCard: {
     height: '100%',
-    minHeight: 300,
-  },
-  widgetHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing(2),
-  },
-  metricsFrame: {
-    width: '100%',
-    height: 300,
-    border: 'none',
+    background: theme.palette.background.paper,
     borderRadius: theme.shape.borderRadius,
+    transition: 'transform 0.2s, box-shadow 0.2s',
+    '&:hover': {
+      transform: 'translateY(-4px)',
+      boxShadow: theme.shadows[4],
+    },
   },
   actionButton: {
     marginRight: theme.spacing(1),
+    borderRadius: theme.shape.borderRadius * 2,
+    textTransform: 'none',
+    padding: theme.spacing(1, 3),
   },
   sectionTitle: {
     marginBottom: theme.spacing(3),
     position: 'relative',
+    paddingBottom: theme.spacing(1),
     '&:after': {
       content: '""',
       position: 'absolute',
-      bottom: -8,
+      bottom: 0,
       left: 0,
       width: 40,
-      height: 4,
-      background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
-      borderRadius: 2,
+      height: 3,
+      background: theme.palette.primary.main,
+      borderRadius: 1.5,
     },
+  },
+  gridContainer: {
+    marginBottom: theme.spacing(4),
+  },
+  statusWidget: {
+    padding: theme.spacing(3),
+    background: theme.palette.background.paper,
+    borderRadius: theme.shape.borderRadius,
+    height: '100%',
+  },
+  agentChip: {
+    margin: theme.spacing(0.5),
+  },
+  refreshButton: {
+    marginLeft: 'auto',
+  },
+  widgetHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: theme.spacing(2),
+  },
+  progressSection: {
+    marginTop: theme.spacing(2),
+  },
+  progress: {
+    height: 8,
+    borderRadius: 4,
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+  },
+  statValue: {
+    fontSize: '2rem',
+    fontWeight: 'bold',
+    color: theme.palette.primary.main,
+    marginBottom: theme.spacing(1),
+  },
+  statLabel: {
+    color: theme.palette.text.secondary,
+    fontSize: '0.875rem',
   },
 }));
 
-const ShortcutCard = ({ icon: Icon, title, description, onClick }) => {
+const StatCard = ({ icon: Icon, value, label, color }) => {
   const classes = useStyles();
   return (
-    <Card className={classes.shortcutCard} onClick={onClick}>
-      <CardContent>
-        <Icon className={classes.shortcutIcon} />
-        <Typography variant="h6" gutterBottom>
-          {title}
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          {description}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
-};
-
-const DashboardWidget = ({ title, children, onMoreClick }) => {
-  const classes = useStyles();
-  const [anchorEl, setAnchorEl] = useState(null);
-
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  return (
-    <Paper className={classes.dashboardWidget}>
-      <Box p={2}>
-        <div className={classes.widgetHeader}>
-          <Typography variant="h6">{title}</Typography>
-          <IconButton size="small" onClick={handleMenuOpen}>
-            <MoreVertIcon />
-          </IconButton>
-        </div>
-        <Menu
-          anchorEl={anchorEl}
-          keepMounted
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-        >
-          <MenuItem onClick={handleMenuClose}>Refresh</MenuItem>
-          <MenuItem onClick={handleMenuClose}>Maximize</MenuItem>
-          <MenuItem onClick={handleMenuClose}>Settings</MenuItem>
-        </Menu>
-        {children}
+    <Paper className={classes.statCard} elevation={1}>
+      <Box p={3}>
+        <Box display="flex" alignItems="center" mb={2}>
+          <Avatar style={{ backgroundColor: color, marginRight: 8 }}>
+            <Icon />
+          </Avatar>
+          <Typography variant="h6">{label}</Typography>
+        </Box>
+        <Typography className={classes.statValue}>{value}</Typography>
       </Box>
     </Paper>
   );
@@ -156,45 +144,12 @@ const DashboardWidget = ({ title, children, onMoreClick }) => {
 function Dashboard() {
   const classes = useStyles();
   const history = useHistory();
+  const stats = useSystemStats();
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const shortcuts = [
-    {
-      icon: ProjectIcon,
-      title: 'New Project',
-      description: 'Create a new project from template',
-      onClick: () => history.push('/projects/new'),
-    },
-    {
-      icon: AIIcon,
-      title: 'AI Agents',
-      description: 'Manage and monitor AI agents',
-      onClick: () => history.push('/agents'),
-    },
-    {
-      icon: MetricsIcon,
-      title: 'Analytics',
-      description: 'View system analytics and metrics',
-      onClick: () => history.push('/metrics'),
-    },
-    {
-      icon: TeamIcon,
-      title: 'Team',
-      description: 'Manage team and permissions',
-      onClick: () => history.push('/team'),
-    },
-    {
-      icon: SecurityIcon,
-      title: 'Security',
-      description: 'Security settings and access control',
-      onClick: () => history.push('/security'),
-    },
-    {
-      icon: SettingsIcon,
-      title: 'Settings',
-      description: 'System configuration and preferences',
-      onClick: () => history.push('/settings'),
-    },
-  ];
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
 
   const quickActions = [
     { 
@@ -202,26 +157,19 @@ function Dashboard() {
       label: 'New Project', 
       onClick: () => history.push('/projects/new'),
       variant: 'contained',
-      color: 'inherit'
+      color: 'primary'
     },
     { 
-      icon: DashboardIcon, 
-      label: 'Dashboards', 
+      icon: MetricsIcon, 
+      label: 'View Metrics', 
       onClick: () => history.push('/metrics'),
       variant: 'outlined',
       color: 'inherit'
     },
     { 
-      icon: BugIcon, 
-      label: 'Debug Console', 
-      onClick: () => history.push('/debug'),
-      variant: 'outlined',
-      color: 'inherit'
-    },
-    { 
-      icon: CloudIcon, 
-      label: 'Resources', 
-      onClick: () => history.push('/resources'),
+      icon: AIIcon, 
+      label: 'Manage Agents', 
+      onClick: () => history.push('/agents'),
       variant: 'outlined',
       color: 'inherit'
     },
@@ -229,14 +177,14 @@ function Dashboard() {
 
   return (
     <Container maxWidth="lg" className={classes.root}>
-      <Paper className={classes.welcomeSection} elevation={0}>
+      <Paper className={classes.welcomeSection} elevation={3}>
         <Typography variant="h4" gutterBottom>
           Welcome to Agent System
         </Typography>
         <Typography variant="subtitle1" paragraph>
-          Manage your projects and AI agents from one central dashboard
+          Your AI-powered project management hub
         </Typography>
-        <Box mt={2}>
+        <Box mt={3}>
           {quickActions.map((action, index) => (
             <Button
               key={index}
@@ -253,51 +201,102 @@ function Dashboard() {
       </Paper>
 
       <Typography variant="h5" className={classes.sectionTitle}>
-        Quick Access
-      </Typography>
-      <Grid container spacing={3} style={{ marginBottom: theme.spacing(4) }}>
-        {shortcuts.map((shortcut, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
-            <ShortcutCard {...shortcut} />
-          </Grid>
-        ))}
-      </Grid>
-
-      <Typography variant="h5" className={classes.sectionTitle}>
         System Overview
       </Typography>
+      <Grid container spacing={3} className={classes.gridContainer}>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            icon={ProjectIcon}
+            value={stats.activeProjects}
+            label="Active Projects"
+            color="#1976d2"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            icon={AIIcon}
+            value={stats.runningWorkers}
+            label="Active Agents"
+            color="#2e7d32"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            icon={PerformanceIcon}
+            value={stats.tasksCompleted}
+            label="Tasks Completed"
+            color="#ed6c02"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            icon={CloudIcon}
+            value={stats.systemUptime}
+            label="System Uptime"
+            color="#9c27b0"
+          />
+        </Grid>
+      </Grid>
+
       <Grid container spacing={3}>
         <Grid item xs={12} md={8}>
-          <DashboardWidget title="System Status">
-            <SystemStatus />
-          </DashboardWidget>
+          <Paper className={classes.statusWidget}>
+            <div className={classes.widgetHeader}>
+              <Typography variant="h6">System Status</Typography>
+              <Tooltip title="Refresh">
+                <IconButton className={classes.refreshButton} onClick={handleRefresh} size="small">
+                  <RefreshIcon />
+                </IconButton>
+              </Tooltip>
+            </div>
+            <SystemStatus key={refreshKey} />
+            <div className={classes.progressSection}>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="body2" color="textSecondary">System Load</Typography>
+                <Typography variant="body2" color="primary">75%</Typography>
+              </Box>
+              <LinearProgress 
+                variant="determinate" 
+                value={75} 
+                className={classes.progress}
+                color="primary"
+              />
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="body2" color="textSecondary">Memory Usage</Typography>
+                <Typography variant="body2" color="secondary">62%</Typography>
+              </Box>
+              <LinearProgress 
+                variant="determinate" 
+                value={62} 
+                className={classes.progress}
+                color="secondary"
+              />
+            </div>
+          </Paper>
         </Grid>
         <Grid item xs={12} md={4}>
-          <DashboardWidget title="Active Projects">
-            <iframe
-              src="/grafana/d/quick-metrics/quick-metrics?orgId=1&kiosk&viewPanel=1"
-              className={classes.metricsFrame}
-              title="Active Projects"
-            />
-          </DashboardWidget>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <DashboardWidget title="Agent Performance">
-            <iframe
-              src="/grafana/d/agent-metrics/agent-metrics?orgId=1&kiosk&viewPanel=2"
-              className={classes.metricsFrame}
-              title="Agent Performance"
-            />
-          </DashboardWidget>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <DashboardWidget title="Task Distribution">
-            <iframe
-              src="/grafana/d/project-analytics/project-analytics?orgId=1&kiosk&viewPanel=3"
-              className={classes.metricsFrame}
-              title="Task Distribution"
-            />
-          </DashboardWidget>
+          <Paper className={classes.statusWidget}>
+            <Typography variant="h6" gutterBottom>Active Agents</Typography>
+            <Box mt={2}>
+              <Chip
+                avatar={<Avatar style={{ backgroundColor: '#4caf50' }}>A1</Avatar>}
+                label="Agent-1 (Ready)"
+                className={classes.agentChip}
+                color="primary"
+              />
+              <Chip
+                avatar={<Avatar style={{ backgroundColor: '#ff9800' }}>A2</Avatar>}
+                label="Agent-2 (Processing)"
+                className={classes.agentChip}
+                color="secondary"
+              />
+              <Chip
+                avatar={<Avatar style={{ backgroundColor: '#2196f3' }}>A3</Avatar>}
+                label="Agent-3 (Idle)"
+                className={classes.agentChip}
+              />
+            </Box>
+          </Paper>
         </Grid>
       </Grid>
     </Container>

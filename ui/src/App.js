@@ -4,7 +4,6 @@ import { ThemeProvider, createTheme, Box, makeStyles } from '@material-ui/core';
 import Navigation from './components/Navigation';
 import Dashboard from './components/Dashboard';
 import Projects from './components/Projects';
-import ProjectCreate from './components/Projects';
 import Agents from './components/Agents';
 import Metrics from './components/Metrics';
 import Settings from './components/Settings';
@@ -13,6 +12,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import SystemStatus from './components/SystemStatus';
 import AuthService from './services/AuthService';
 import ErrorBoundary from './components/ErrorBoundary';
+import { NotificationProvider } from './context/NotificationContext';
 
 // Create theme
 const theme = createTheme({
@@ -58,25 +58,28 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
-      <Router>
-        <ErrorBoundary>
-          <div className={classes.root}>
-            {isAuthenticated && <Navigation />}
-            <main className={classes.content}>
-              <Switch>
-                <Route exact path="/login" component={Login} />
-                <ProtectedRoute exact path="/" component={Dashboard} />
-                <ProtectedRoute exact path="/projects" component={Projects} />
-                <ProtectedRoute exact path="/projects/new" component={Projects} />
-                <ProtectedRoute exact path="/agents" component={Agents} />
-                <ProtectedRoute exact path="/metrics" component={Metrics} />
-                <ProtectedRoute exact path="/settings" component={Settings} />
-                <Redirect to="/" />
-              </Switch>
-            </main>
-          </div>
-        </ErrorBoundary>
-      </Router>
+      <NotificationProvider>
+        <Router>
+          <ErrorBoundary>
+            <div className={classes.root}>
+              {isAuthenticated && <Navigation />}
+              <main className={classes.content}>
+                <Switch>
+                  <Route exact path="/login" component={Login} />
+                  <ProtectedRoute exact path="/" component={Dashboard} />
+                  <ProtectedRoute exact path="/projects" component={Projects} />
+                  <ProtectedRoute exact path="/projects/new" component={Projects} />
+                  <ProtectedRoute exact path="/projects/:id" component={Projects} />
+                  <ProtectedRoute exact path="/agents" component={Agents} />
+                  <ProtectedRoute exact path="/metrics" component={Metrics} />
+                  <ProtectedRoute exact path="/settings" component={Settings} />
+                  <Redirect to="/" />
+                </Switch>
+              </main>
+            </div>
+          </ErrorBoundary>
+        </Router>
+      </NotificationProvider>
     </ThemeProvider>
   );
 }

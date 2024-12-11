@@ -1,28 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Grid,
   Paper,
   Typography,
-  makeStyles,
   CircularProgress,
   LinearProgress,
   Box,
+  makeStyles,
 } from '@material-ui/core';
-import axios from 'axios';
 
 const useStyles = makeStyles((theme) => ({
   root: {
     flexGrow: 1,
+    padding: theme.spacing(2),
   },
   paper: {
     padding: theme.spacing(2),
     height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    background: theme.palette.background.paper,
   },
   title: {
     marginBottom: theme.spacing(2),
+    color: theme.palette.primary.main,
   },
   metric: {
     marginBottom: theme.spacing(2),
@@ -34,14 +33,28 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 200,
+    height: '200px',
   },
   error: {
     color: theme.palette.error.main,
     textAlign: 'center',
-    padding: theme.spacing(2),
   },
 }));
+
+async function queryPrometheus(query) {
+  try {
+    const response = await axios.get('/prometheus/api/v1/query', {
+      params: {
+        query,
+        time: Date.now() / 1000,
+      },
+    });
+    return response.data?.data?.result?.[0]?.value?.[1] || '0';
+  } catch (error) {
+    console.error(`Error querying Prometheus for ${query}:`, error);
+    return '0';
+  }
+}
 
 function SystemStatus() {
   const classes = useStyles();
@@ -51,73 +64,63 @@ function SystemStatus() {
 
   const fetchMetrics = async () => {
     try {
-      const response = await axios.get('/api/metrics');
-      const metricsText = response.data;
-      
-      // Parse Prometheus metrics
+      // Fetch health status
+      const healthResponse = await axios.get('/api/health');
+      const healthData = healthResponse.data;
+
+      // Fetch Prometheus metrics
+      const [
+        activeAgents,
+        healthyAgents,
+        unhealthyAgents,
+        totalProjects,
+        activeProjects,
+        totalTasks,
+        completedTasks,
+        workerConnections,
+        systemUptime,
+      ] = await Promise.all([
+        queryPrometheus('active_agents'),
+        queryPrometheus('ai_agents_by_status{status="healthy"}'),
+        queryPrometheus('ai_agents_by_status{status="unhealthy"}'),
+        queryPrometheus('project_total'),
+        queryPrometheus('active_projects'),
+        queryPrometheus('tasks_created_total'),
+        queryPrometheus('project_tasks_by_status{status="completed"}'),
+        queryPrometheus('worker_connections'),
+        queryPrometheus('process_uptime_seconds'),
+      ]);
+
       const parsedMetrics = {
-        projects: {
-          total: 0,
-          active: 0,
-        },
-        tasks: {
-          total: 0,
-          byStatus: {},
-          byPriority: {},
+        system: {
+          database: healthData.components.database === 'healthy',
+          messageQueue: healthData.components.message_queue === 'healthy',
+          ollama: healthData.components.ollama === 'healthy',
+          websocket: healthData.components.websocket?.status === 'healthy' || false,
+          connections: parseInt(workerConnections),
+          uptime: parseFloat(systemUptime).toFixed(2),
         },
         agents: {
-          total: 0,
-          byStatus: {},
+          total: parseInt(activeAgents),
+          byStatus: {
+            healthy: parseInt(healthyAgents),
+            unhealthy: parseInt(unhealthyAgents),
+          }
         },
-        system: {
-          requestRate: 0,
-          errorRate: 0,
-          avgResponseTime: 0,
-        },
+        projects: {
+          total: parseInt(totalProjects),
+          active: parseInt(activeProjects),
+          tasks: parseInt(totalTasks),
+          completed: parseInt(completedTasks),
+        }
       };
-
-      // Parse metrics text
-      metricsText.split('\n').forEach(line => {
-        if (line.startsWith('#')) return;
-        
-        if (line.includes('project_total')) {
-          parsedMetrics.projects.total = parseFloat(line.split(' ')[1]);
-        }
-        else if (line.includes('active_projects')) {
-          parsedMetrics.projects.active = parseFloat(line.split(' ')[1]);
-        }
-        else if (line.includes('project_tasks_total')) {
-          parsedMetrics.tasks.total += parseFloat(line.split(' ')[1]);
-        }
-        else if (line.includes('project_tasks_by_status')) {
-          const match = line.match(/status="([^"]+)"\s+(\d+)/);
-          if (match) {
-            parsedMetrics.tasks.byStatus[match[1]] = parseFloat(match[2]);
-          }
-        }
-        else if (line.includes('ai_agents_total')) {
-          parsedMetrics.agents.total = parseFloat(line.split(' ')[1]);
-        }
-        else if (line.includes('ai_agents_by_status')) {
-          const match = line.match(/status="([^"]+)"\s+(\d+)/);
-          if (match) {
-            parsedMetrics.agents.byStatus[match[1]] = parseFloat(match[2]);
-          }
-        }
-        else if (line.includes('http_request_duration_seconds_sum')) {
-          const value = parseFloat(line.split(' ')[1]);
-          parsedMetrics.system.avgResponseTime = value;
-        }
-        else if (line.includes('http_requests_total')) {
-          const value = parseFloat(line.split(' ')[1]);
-          parsedMetrics.system.requestRate = value;
-        }
-      });
 
       setMetrics(parsedMetrics);
       setLoading(false);
+      setError(null);
     } catch (err) {
-      setError(err.message);
+      console.error('Error fetching metrics:', err);
+      setError(err.message || 'Failed to fetch metrics');
       setLoading(false);
     }
   };
@@ -147,77 +150,116 @@ function SystemStatus() {
   return (
     <div className={classes.root}>
       <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={4}>
           <Paper className={classes.paper}>
             <Typography variant="h6" className={classes.title}>
-              Projects & Tasks
+              System Health
             </Typography>
             <div className={classes.metric}>
               <Typography variant="subtitle1">
-                Active Projects: {metrics.projects.active} / {metrics.projects.total}
+                Database: {metrics?.system.database ? 'Healthy' : 'Unhealthy'}
               </Typography>
               <LinearProgress
                 variant="determinate"
-                value={(metrics.projects.active / metrics.projects.total) * 100}
+                value={metrics?.system.database ? 100 : 0}
                 className={classes.progress}
+                color={metrics?.system.database ? "primary" : "secondary"}
               />
             </div>
             <div className={classes.metric}>
               <Typography variant="subtitle1">
-                Total Tasks: {metrics.tasks.total}
+                Message Queue: {metrics?.system.messageQueue ? 'Healthy' : 'Unhealthy'}
               </Typography>
-              <Box mt={1}>
-                {Object.entries(metrics.tasks.byStatus).map(([status, count]) => (
-                  <div key={status}>
-                    <Typography variant="body2">
-                      {status}: {count}
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={(count / metrics.tasks.total) * 100}
-                      className={classes.progress}
-                    />
-                  </div>
-                ))}
-              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={metrics?.system.messageQueue ? 100 : 0}
+                className={classes.progress}
+                color={metrics?.system.messageQueue ? "primary" : "secondary"}
+              />
             </div>
+            <div className={classes.metric}>
+              <Typography variant="subtitle1">
+                WebSocket: {metrics?.system.websocket ? 'Healthy' : 'Unhealthy'}
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={metrics?.system.websocket ? 100 : 0}
+                className={classes.progress}
+                color={metrics?.system.websocket ? "primary" : "secondary"}
+              />
+            </div>
+            <Typography variant="body2" color="textSecondary">
+              System Uptime: {metrics?.system.uptime} seconds
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={4}>
           <Paper className={classes.paper}>
             <Typography variant="h6" className={classes.title}>
-              System Performance
-            </Typography>
-            <div className={classes.metric}>
-              <Typography variant="subtitle1">
-                Request Rate: {metrics.system.requestRate.toFixed(2)} req/s
-              </Typography>
-              <Typography variant="subtitle1">
-                Avg Response Time: {metrics.system.avgResponseTime.toFixed(2)} ms
-              </Typography>
-            </div>
-            <Typography variant="h6" className={classes.title} style={{ marginTop: 16 }}>
               Agent Status
             </Typography>
             <div className={classes.metric}>
               <Typography variant="subtitle1">
-                Total Agents: {metrics.agents.total}
+                Active Agents: {metrics?.agents.total || 0}
+              </Typography>
+              <Typography variant="subtitle1">
+                Ollama Status: {metrics?.system.ollama ? 'Connected' : 'Disconnected'}
               </Typography>
               <Box mt={1}>
-                {Object.entries(metrics.agents.byStatus).map(([status, count]) => (
-                  <div key={status}>
-                    <Typography variant="body2">
-                      {status}: {count}
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={(count / metrics.agents.total) * 100}
-                      className={classes.progress}
-                    />
-                  </div>
-                ))}
+                <Typography variant="body2">
+                  Healthy Agents: {metrics?.agents.byStatus.healthy || 0}
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={metrics?.agents.total > 0 ? (metrics?.agents.byStatus.healthy / metrics?.agents.total) * 100 : 0}
+                  className={classes.progress}
+                  color="primary"
+                />
+                <Typography variant="body2">
+                  Unhealthy Agents: {metrics?.agents.byStatus.unhealthy || 0}
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={metrics?.agents.total > 0 ? (metrics?.agents.byStatus.unhealthy / metrics?.agents.total) * 100 : 0}
+                  className={classes.progress}
+                  color="secondary"
+                />
               </Box>
+              <Typography variant="body2" color="textSecondary">
+                Active Connections: {metrics?.system.connections}
+              </Typography>
+            </div>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Paper className={classes.paper}>
+            <Typography variant="h6" className={classes.title}>
+              Project Overview
+            </Typography>
+            <div className={classes.metric}>
+              <Typography variant="subtitle1">
+                Total Projects: {metrics?.projects.total || 0}
+              </Typography>
+              <Typography variant="subtitle1">
+                Active Projects: {metrics?.projects.active || 0}
+              </Typography>
+              <Typography variant="subtitle1">
+                Total Tasks: {metrics?.projects.tasks || 0}
+              </Typography>
+              <Typography variant="subtitle1">
+                Completed Tasks: {metrics?.projects.completed || 0}
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={metrics?.projects.tasks > 0 ? (metrics?.projects.completed / metrics?.projects.tasks) * 100 : 0}
+                className={classes.progress}
+                color="primary"
+              />
+              <Typography variant="body2" color="textSecondary">
+                Task Completion Rate: {metrics?.projects.tasks > 0 ? ((metrics?.projects.completed / metrics?.projects.tasks) * 100).toFixed(1) : 0}%
+              </Typography>
             </div>
           </Paper>
         </Grid>

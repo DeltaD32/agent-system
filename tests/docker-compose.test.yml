@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - API_URL=http://orchestrator:5000/api
+      - UI_URL=http://ui:3000
+      - GRAFANA_URL=http://grafana:3001
+    networks:
+      - test_net
+      - project_backend_net
+      - project_frontend_net
+
+networks:
+  test_net:
+    driver: bridge
+  project_backend_net:
+    external: true
+  project_frontend_net:
+    external: true 

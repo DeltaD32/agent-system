@@ -31,7 +31,7 @@ ACTIVE_TASKS = Gauge('active_tasks', 'Number of active tasks')
 MISTRAL_REQUESTS = Counter('mistral_requests_total', 'Total number of requests to Mistral')
 MISTRAL_ERRORS = Counter('mistral_errors_total', 'Total number of Mistral errors')
 
-# Define Prometheus metrics
+# Project metrics
 PROJECTS_TOTAL = Gauge('project_total', 'Total number of projects')
 ACTIVE_PROJECTS = Gauge('active_projects', 'Number of active projects')
 TASKS_TOTAL = Gauge('project_tasks_total', 'Total number of tasks', ['project'])
@@ -64,9 +64,62 @@ def get_db_connection():
         password=os.environ.get('DB_PASSWORD', 'projectpass')
     )
 
+def update_metrics():
+    """Update Prometheus metrics"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Update project metrics
+        cur.execute("SELECT COUNT(*) FROM projects")
+        total_projects = cur.fetchone()[0]
+        PROJECTS_TOTAL.set(total_projects)
+
+        cur.execute("SELECT COUNT(*) FROM projects WHERE status = 'active'")
+        active_projects = cur.fetchone()[0]
+        ACTIVE_PROJECTS.set(active_projects)
+
+        # Update task metrics
+        cur.execute("SELECT project_id, COUNT(*) FROM tasks GROUP BY project_id")
+        for project_id, count in cur.fetchall():
+            TASKS_TOTAL.labels(project=str(project_id)).set(count)
+
+        cur.execute("SELECT status, COUNT(*) FROM tasks GROUP BY status")
+        for status, count in cur.fetchall():
+            TASKS_BY_STATUS.labels(status=status).set(count)
+
+        cur.execute("SELECT priority, COUNT(*) FROM tasks GROUP BY priority")
+        for priority, count in cur.fetchall():
+            TASKS_BY_PRIORITY.labels(priority=priority).set(count)
+
+        # Update project completion
+        cur.execute("""
+            SELECT p.id, 
+                   COALESCE(CAST(COUNT(CASE WHEN t.status = 'completed' THEN 1 END) AS FLOAT) / 
+                   NULLIF(COUNT(*), 0) * 100, 0)
+            FROM projects p
+            LEFT JOIN tasks t ON p.id = t.project_id
+            GROUP BY p.id
+        """)
+        for project_id, completion in cur.fetchall():
+            PROJECT_COMPLETION.labels(project=str(project_id)).set(completion)
+
+        # Update agent metrics
+        AGENT_COUNT.set(len(active_connections))
+        healthy_agents = sum(1 for conn in active_connections if conn.get('status') == 'healthy')
+        unhealthy_agents = len(active_connections) - healthy_agents
+        AGENT_STATUS.labels(status='healthy').set(healthy_agents)
+        AGENT_STATUS.labels(status='unhealthy').set(unhealthy_agents)
+
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Error updating metrics: {e}")
+
 @app.route('/health')
 def health():
     """Health check endpoint"""
+    update_metrics()  # Update metrics before health check
     return jsonify({
         'status': 'healthy',
         'components': {
@@ -75,7 +128,7 @@ def health():
             'ollama': check_ollama_health(),
             'websocket': {
                 'status': 'healthy',
-                'connections': get_websocket_connections()
+                'connections': len(active_connections)
             }
         }
     })
@@ -83,6 +136,7 @@ def health():
 @app.route('/metrics')
 def metrics():
     """Prometheus metrics endpoint"""
+    update_metrics()  # Update metrics before generating response
     return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
 # Add metrics middleware
@@ -310,130 +364,239 @@ def get_task(task_id):
         cur.close()
         conn.close()
 
-@app.route('/api/projects', methods=['GET'])
+@app.route('/api/projects', methods=['GET', 'POST'])
 @require_auth
-def list_projects():
-    """List all projects"""
+def handle_projects():
+    """Handle project operations"""
     try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            cur.execute('SELECT * FROM projects ORDER BY created_at DESC')
-            projects = cur.fetchall()
+        if request.method == 'POST':
+            data = request.get_json()
             
-            # Format projects
-            formatted_projects = []
-            for project in projects:
-                # Get tasks for this project
-                cur.execute('SELECT * FROM tasks WHERE project_id = %s', (project[0],))
-                tasks = cur.fetchall()
+            if not data or 'name' not in data:
+                return jsonify({"error": "Project name is required"}), 400
                 
-                formatted_projects.append({
-                    'project': {
-                        'id': project[0],
-                        'name': project[1],
-                        'description': project[2],
-                        'status': project[3],
-                        'created_at': project[4].isoformat(),
-                        'updated_at': project[5].isoformat(),
-                    },
-                    'tasks': [
-                        {
-                            'id': task[0],
-                            'description': task[2],
-                            'status': task[3],
-                            'assigned_agent': task[4],
-                        }
-                        for task in tasks
-                    ]
-                })
-            
-            return jsonify(formatted_projects)
-    except Exception as e:
-        app.logger.error(f"Error listing projects: {str(e)}")
-        return jsonify({'error': 'Failed to list projects'}), 500
-
-@app.route('/api/projects', methods=['POST'])
-@require_auth
-def create_project():
-    """Create a new project"""
-    try:
-        data = request.get_json()
-        
-        if not data or 'name' not in data:
-            return jsonify({'error': 'Project name is required'}), 400
-        
-        with get_db_connection() as conn:
+            conn = get_db_connection()
             cur = conn.cursor()
             
-            # Insert project
+            # Create project
             cur.execute(
-                'INSERT INTO projects (name, description, status) VALUES (%s, %s, %s) RETURNING id',
-                (data['name'], data.get('description', ''), 'pending')
+                '''
+                INSERT INTO projects (name, description, status, created_at, metadata)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+                ''',
+                (
+                    data['name'],
+                    data.get('description', ''),
+                    'active',
+                    datetime.now(timezone.utc),
+                    json.dumps(data.get('metadata', {}))
+                )
             )
-            project_id = cur.fetchone()[0]
             
-            # If template is specified, create tasks from template
-            if 'template_id' in data:
-                template = get_template_by_id(data['template_id'])
-                if template and template.get('tasks'):
-                    for task in template['tasks']:
-                        cur.execute(
-                            'INSERT INTO tasks (project_id, description, status) VALUES (%s, %s, %s)',
-                            (project_id, task['description'], 'pending')
-                        )
+            project_id = cur.fetchone()[0]
+            conn.commit()
+            
+            # Get the created project
+            cur.execute(
+                '''
+                SELECT id, name, description, status, created_at, updated_at, metadata
+                FROM projects WHERE id = %s
+                ''',
+                (project_id,)
+            )
+            
+            project = cur.fetchone()
+            
+            cur.close()
+            conn.close()
+            
+            # Update metrics
+            PROJECTS_TOTAL.inc()
+            ACTIVE_PROJECTS.inc()
+            
+            return jsonify({
+                'id': project[0],
+                'name': project[1],
+                'description': project[2],
+                'status': project[3],
+                'created_at': project[4].isoformat(),
+                'updated_at': project[5].isoformat(),
+                'metadata': project[6]
+            }), 201
+            
+        else:  # GET request
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            cur.execute(
+                '''
+                SELECT id, name, description, status, created_at, updated_at, metadata
+                FROM projects
+                ORDER BY created_at DESC
+                '''
+            )
+            
+            projects = []
+            for row in cur.fetchall():
+                projects.append({
+                    'id': row[0],
+                    'name': row[1],
+                    'description': row[2],
+                    'status': row[3],
+                    'created_at': row[4].isoformat(),
+                    'updated_at': row[5].isoformat(),
+                    'metadata': row[6]
+                })
+                
+            cur.close()
+            conn.close()
+            
+            return jsonify(projects), 200
+            
+    except Exception as e:
+        logger.error(f"Error handling projects: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/projects/<int:project_id>', methods=['GET', 'PUT', 'DELETE'])
+@require_auth
+def handle_project(project_id):
+    """Handle individual project operations"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if request.method == 'GET':
+            # Get project details
+            cur.execute(
+                '''
+                SELECT id, name, description, status, created_at, updated_at, metadata
+                FROM projects WHERE id = %s
+                ''',
+                (project_id,)
+            )
+            
+            project = cur.fetchone()
+            if not project:
+                return jsonify({"error": "Project not found"}), 404
+
+            # Get project tasks
+            cur.execute(
+                '''
+                SELECT id, description, status, created_at, updated_at
+                FROM tasks
+                WHERE project_id = %s
+                ORDER BY created_at DESC
+                ''',
+                (project_id,)
+            )
+            
+            tasks = []
+            for task in cur.fetchall():
+                tasks.append({
+                    'id': task[0],
+                    'description': task[1],
+                    'status': task[2],
+                    'created_at': task[3].isoformat(),
+                    'updated_at': task[4].isoformat() if task[4] else None
+                })
+
+            return jsonify({
+                'id': project[0],
+                'name': project[1],
+                'description': project[2],
+                'status': project[3],
+                'created_at': project[4].isoformat(),
+                'updated_at': project[5].isoformat() if project[5] else None,
+                'metadata': project[6],
+                'tasks': tasks
+            }), 200
+
+        elif request.method == 'PUT':
+            data = request.get_json()
+            
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+
+            # Update project
+            update_fields = []
+            update_values = []
+            
+            if 'name' in data:
+                update_fields.append('name = %s')
+                update_values.append(data['name'])
+            
+            if 'description' in data:
+                update_fields.append('description = %s')
+                update_values.append(data['description'])
+            
+            if 'status' in data:
+                update_fields.append('status = %s')
+                update_values.append(data['status'])
+            
+            if 'metadata' in data:
+                update_fields.append('metadata = %s')
+                update_values.append(json.dumps(data['metadata']))
+            
+            update_fields.append('updated_at = %s')
+            update_values.append(datetime.now(timezone.utc))
+            
+            # Add project_id to values
+            update_values.append(project_id)
+            
+            if update_fields:
+                query = f'''
+                    UPDATE projects 
+                    SET {', '.join(update_fields)}, updated_at = NOW()
+                    WHERE id = %s
+                    RETURNING id, name, description, status, created_at, updated_at, metadata
+                '''
+                
+                cur.execute(query, update_values)
+                updated_project = cur.fetchone()
+                
+                if not updated_project:
+                    return jsonify({"error": "Project not found"}), 404
+                
+                conn.commit()
+                
+                return jsonify({
+                    'id': updated_project[0],
+                    'name': updated_project[1],
+                    'description': updated_project[2],
+                    'status': updated_project[3],
+                    'created_at': updated_project[4].isoformat(),
+                    'updated_at': updated_project[5].isoformat(),
+                    'metadata': updated_project[6]
+                }), 200
+            
+            return jsonify({"error": "No fields to update"}), 400
+
+        elif request.method == 'DELETE':
+            # Check if project exists
+            cur.execute('SELECT id FROM projects WHERE id = %s', (project_id,))
+            if not cur.fetchone():
+                return jsonify({"error": "Project not found"}), 404
+
+            # Delete associated tasks
+            cur.execute('DELETE FROM tasks WHERE project_id = %s', (project_id,))
+            
+            # Delete the project
+            cur.execute('DELETE FROM projects WHERE id = %s', (project_id,))
             
             conn.commit()
             
-            return jsonify({
-                'message': 'Project created successfully',
-                'project_id': project_id
-            }), 201
+            # Update metrics
+            ACTIVE_PROJECTS.dec()
             
-    except Exception as e:
-        app.logger.error(f"Error creating project: {str(e)}")
-        return jsonify({'error': 'Failed to create project'}), 500
+            return jsonify({"message": "Project deleted successfully"}), 200
 
-@app.route('/api/projects/<int:project_id>', methods=['GET'])
-@require_auth
-def get_project(project_id):
-    """Get project details"""
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            
-            # Get project
-            cur.execute('SELECT * FROM projects WHERE id = %s', (project_id,))
-            project = cur.fetchone()
-            
-            if not project:
-                return jsonify({'error': 'Project not found'}), 404
-            
-            # Get tasks
-            cur.execute('SELECT * FROM tasks WHERE project_id = %s', (project_id,))
-            tasks = cur.fetchall()
-            
-            return jsonify({
-                'project': {
-                    'id': project[0],
-                    'name': project[1],
-                    'description': project[2],
-                    'status': project[3],
-                    'created_at': project[4].isoformat(),
-                    'updated_at': project[5].isoformat(),
-                },
-                'tasks': [
-                    {
-                        'id': task[0],
-                        'description': task[2],
-                        'status': task[3],
-                        'assigned_agent': task[4],
-                    }
-                    for task in tasks
-                ]
-            })
     except Exception as e:
-        app.logger.error(f"Error getting project: {str(e)}")
-        return jsonify({'error': 'Failed to get project'}), 500
+        logger.error(f"Error handling project {project_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 def check_database_health():
     """Check database health"""
@@ -481,22 +644,101 @@ def get_websocket_connections():
     """Get current WebSocket connections count"""
     return len(active_connections)
 
-@app.route('/api/auth/login', methods=['POST'])
+@app.route('/api/login', methods=['POST'])
 def login():
-    """Login endpoint"""
-    data = request.get_json()
-    
-    if not data or 'username' not in data or 'password' not in data:
-        return jsonify({'error': 'Username and password are required'}), 400
-    
-    if data['username'] == ADMIN_USERNAME and data['password'] == ADMIN_PASSWORD:
-        token = create_jwt_token(data['username'])
-        return jsonify({
-            'token': token,
-            'username': data['username']
-        })
-    
-    return jsonify({'error': 'Invalid credentials'}), 401
+    """Handle user login"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'username' not in data or 'password' not in data:
+            return jsonify({"error": "Missing username or password"}), 400
+            
+        # Check credentials against default admin
+        if data['username'] == ADMIN_USERNAME and data['password'] == ADMIN_PASSWORD:
+            # Generate JWT token
+            token = create_jwt_token(data['username'])
+            return jsonify({
+                "token": token,
+                "message": "Login successful"
+            }), 200
+        else:
+            return jsonify({"error": "Invalid credentials"}), 401
+            
+    except Exception as e:
+        logger.error(f"Error during login: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/projects', methods=['GET', 'POST'])
+@require_auth
+def projects():
+    """Handle project operations"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if request.method == 'GET':
+            # Get all projects
+            cur.execute('''
+                SELECT id, name, description, status, created_at, updated_at
+                FROM projects
+                ORDER BY created_at DESC
+            ''')
+            
+            projects = []
+            for row in cur.fetchall():
+                projects.append({
+                    'id': row[0],
+                    'name': row[1],
+                    'description': row[2],
+                    'status': row[3],
+                    'created_at': row[4].isoformat() if row[4] else None,
+                    'updated_at': row[5].isoformat() if row[5] else None
+                })
+            
+            return jsonify(projects), 200
+
+        elif request.method == 'POST':
+            data = request.get_json()
+            
+            if not data or 'name' not in data:
+                return jsonify({"error": "Missing required fields"}), 400
+                
+            # Create project
+            cur.execute(
+                '''
+                INSERT INTO projects (name, description, status, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+                ''',
+                (
+                    data['name'],
+                    data.get('description', ''),
+                    'active',
+                    datetime.now(timezone.utc),
+                    datetime.now(timezone.utc)
+                )
+            )
+            
+            project_id = cur.fetchone()[0]
+            conn.commit()
+            
+            # Update metrics
+            PROJECTS_TOTAL.inc()
+            ACTIVE_PROJECTS.inc()
+            
+            return jsonify({
+                "id": project_id,
+                "message": "Project created successfully"
+            }), 201
+
+    except Exception as e:
+        logger.error(f"Error handling projects: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000) 

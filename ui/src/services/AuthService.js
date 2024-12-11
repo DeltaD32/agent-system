@@ -1,4 +1,5 @@
 import jwtDecode from 'jwt-decode';
+import axios from 'axios';
 
 class AuthService {
   static TOKEN_KEY = 'auth_token';
@@ -15,14 +16,25 @@ class AuthService {
            password === this.ADMIN_CREDENTIALS.password;
   }
 
-  static login(username, password) {
-    if (this.validateCredentials(username, password)) {
-      localStorage.setItem(this.TOKEN_KEY, 'admin-token');
-      localStorage.setItem(this.IS_AUTHENTICATED, 'true');
-      window.dispatchEvent(new Event('auth-change'));
-      return true;
+  static async login(username, password) {
+    try {
+      if (this.validateCredentials(username, password)) {
+        const response = await axios.post('/api/login', {
+          username,
+          password
+        });
+
+        const { token } = response.data;
+        localStorage.setItem(this.TOKEN_KEY, token);
+        localStorage.setItem(this.IS_AUTHENTICATED, 'true');
+        window.dispatchEvent(new Event('auth-change'));
+        return true;
+      }
+      throw new Error('Invalid username or password');
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
-    throw new Error('Invalid username or password');
   }
 
   static logout() {

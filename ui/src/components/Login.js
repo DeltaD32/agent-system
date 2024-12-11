@@ -91,11 +91,20 @@ function Login() {
     setFieldErrors({ username: false, password: false });
 
     try {
-      await AuthService.login(username, password);
-      const { from } = location.state || { pathname: '/' };
-      history.replace(from);
+      const success = await AuthService.login(username, password);
+      if (success) {
+        const { from } = location.state || { from: { pathname: '/' } };
+        history.replace(from);
+      }
     } catch (error) {
-      setError(error.message);
+      console.error('Login error:', error);
+      if (error.response?.data?.error) {
+        setError(error.response.data.error);
+      } else if (error.message) {
+        setError(error.message);
+      } else {
+        setError('Failed to login. Please try again.');
+      }
       setFieldErrors({ username: true, password: true });
     } finally {
       setLoading(false);
