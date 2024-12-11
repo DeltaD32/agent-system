@@ -155,21 +155,27 @@ function Dashboard() {
     { 
       icon: AddIcon, 
       label: 'New Project', 
-      onClick: () => history.push('/projects/new'),
+      onClick: () => {
+        history.push('/projects/new');
+      },
       variant: 'contained',
       color: 'primary'
     },
     { 
       icon: MetricsIcon, 
       label: 'View Metrics', 
-      onClick: () => history.push('/metrics'),
+      onClick: () => {
+        history.push('/metrics');
+      },
       variant: 'outlined',
       color: 'inherit'
     },
     { 
       icon: AIIcon, 
       label: 'Manage Agents', 
-      onClick: () => history.push('/agents'),
+      onClick: () => {
+        history.push('/agents');
+      },
       variant: 'outlined',
       color: 'inherit'
     },
@@ -193,6 +199,7 @@ function Dashboard() {
               className={classes.actionButton}
               startIcon={<action.icon />}
               onClick={action.onClick}
+              disableElevation
             >
               {action.label}
             </Button>

@@ -260,7 +260,7 @@ function Projects() {
         template_id: selectedTemplate || undefined
       };
 
-      const response = await axios.post('/api/projects', projectData, {
+      await axios.post('/api/projects', projectData, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -269,12 +269,13 @@ function Projects() {
       
       showNotification('Project created successfully', 'success');
       
-      // Clear form
+      // Clear form and refresh projects list
       setProjectName('');
       setProjectDescription('');
       setSelectedTemplate('');
       
-      // Redirect to projects list
+      // Fetch updated projects list and redirect
+      await fetchProjects();
       history.push('/projects');
     } catch (error) {
       console.error('Error creating project:', error);
@@ -283,6 +284,7 @@ function Projects() {
         history.push('/login');
       } else {
         setError(error.response?.data?.error || 'Failed to create project. Please try again.');
+        showNotification('Failed to create project. Please try again.', 'error');
       }
     } finally {
       setLoading(false);

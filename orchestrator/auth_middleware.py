@@ -1,7 +1,8 @@
 import os
 import jwt
 from functools import wraps
-from flask import request, jsonify
+from quart import request, Response
+import json
 from datetime import datetime, timedelta
 
 # JWT configuration
@@ -20,29 +21,45 @@ def create_jwt_token(username):
 def require_auth(f):
     """Decorator to protect routes with JWT token"""
     @wraps(f)
-    def decorated(*args, **kwargs):
+    async def decorated(*args, **kwargs):
         token = None
         
         # Get token from header
         if 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
+            auth_header = request.headers.get('Authorization')
             try:
                 token = auth_header.split(" ")[1]
             except IndexError:
-                return jsonify({'error': 'Token is missing'}), 401
+                return Response(
+                    response=json.dumps({'error': 'Token is missing'}),
+                    status=401,
+                    mimetype='application/json'
+                )
         
         if not token:
-            return jsonify({'error': 'Authentication required'}), 401
+            return Response(
+                response=json.dumps({'error': 'Authentication required'}),
+                status=401,
+                mimetype='application/json'
+            )
         
         try:
             # Verify token
             data = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
-            current_user = data['username']
-            return f(*args, **kwargs)
+            request.current_user = data['username']
+            return await f(*args, **kwargs)
         except jwt.ExpiredSignatureError:
-            return jsonify({'error': 'Token has expired'}), 401
+            return Response(
+                response=json.dumps({'error': 'Token has expired'}),
+                status=401,
+                mimetype='application/json'
+            )
         except jwt.InvalidTokenError:
-            return jsonify({'error': 'Token is invalid'}), 401
+            return Response(
+                response=json.dumps({'error': 'Token is invalid'}),
+                status=401,
+                mimetype='application/json'
+            )
     
     return decorated
 

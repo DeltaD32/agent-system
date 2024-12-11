@@ -32,6 +32,7 @@ import {
   Speed as PerformanceIcon,
   Code as IntegrationIcon,
   BugReport as DebugIcon,
+  Discord as DiscordIcon,
 } from '@material-ui/icons';
 import { useNotification } from '../context/NotificationContext';
 import axios from 'axios';
@@ -146,6 +147,14 @@ function Settings() {
       githubEnabled: false,
       slackEnabled: false,
       jiraEnabled: false,
+      discord: {
+        enabled: false,
+        webhookUrl: '',
+        channelId: '',
+        notifyOnProjectUpdates: true,
+        notifyOnTaskCompletion: true,
+        notifyOnErrors: true,
+      },
     },
     debug: {
       loggingLevel: 'info',
@@ -428,15 +437,103 @@ function Settings() {
                 }
                 label="Slack Integration"
               />
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<SaveIcon />}
-                onClick={() => handleSave('integrations')}
-                className={classes.actionButton}
-              >
-                Save Integration Settings
-              </Button>
+              <Divider style={{ margin: '16px 0' }} />
+              <Typography variant="subtitle2" gutterBottom>
+                Discord Integration
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={settings.integrations.discord.enabled}
+                    onChange={(e) => updateSetting('integrations', 'discord', {
+                      ...settings.integrations.discord,
+                      enabled: e.target.checked
+                    })}
+                    color="primary"
+                  />
+                }
+                label="Enable Discord Integration"
+              />
+              {settings.integrations.discord.enabled && (
+                <>
+                  <TextField
+                    fullWidth
+                    label="Webhook URL"
+                    value={settings.integrations.discord.webhookUrl}
+                    onChange={(e) => updateSetting('integrations', 'discord', {
+                      ...settings.integrations.discord,
+                      webhookUrl: e.target.value
+                    })}
+                    margin="normal"
+                    type="password"
+                    helperText="Discord webhook URL for notifications"
+                  />
+                  <TextField
+                    fullWidth
+                    label="Channel ID"
+                    value={settings.integrations.discord.channelId}
+                    onChange={(e) => updateSetting('integrations', 'discord', {
+                      ...settings.integrations.discord,
+                      channelId: e.target.value
+                    })}
+                    margin="normal"
+                    helperText="Discord channel ID for notifications"
+                  />
+                  <Typography variant="subtitle2" gutterBottom style={{ marginTop: '16px' }}>
+                    Notification Settings
+                  </Typography>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={settings.integrations.discord.notifyOnProjectUpdates}
+                        onChange={(e) => updateSetting('integrations', 'discord', {
+                          ...settings.integrations.discord,
+                          notifyOnProjectUpdates: e.target.checked
+                        })}
+                        color="primary"
+                      />
+                    }
+                    label="Project Updates"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={settings.integrations.discord.notifyOnTaskCompletion}
+                        onChange={(e) => updateSetting('integrations', 'discord', {
+                          ...settings.integrations.discord,
+                          notifyOnTaskCompletion: e.target.checked
+                        })}
+                        color="primary"
+                      />
+                    }
+                    label="Task Completion"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={settings.integrations.discord.notifyOnErrors}
+                        onChange={(e) => updateSetting('integrations', 'discord', {
+                          ...settings.integrations.discord,
+                          notifyOnErrors: e.target.checked
+                        })}
+                        color="primary"
+                      />
+                    }
+                    label="System Errors"
+                  />
+                </>
+              )}
+              <Box mt={2}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<SaveIcon />}
+                  onClick={() => handleSave('integrations')}
+                  className={classes.actionButton}
+                >
+                  Save Integration Settings
+                </Button>
+              </Box>
             </SettingCard>
           </Grid>
 

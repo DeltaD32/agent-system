@@ -4,22 +4,24 @@ services:
   ui:
     build: ./ui
     ports:
-      - "3000:3000"
+      - "3000:80"
     depends_on:
       - orchestrator
     networks:
       - frontend_net
       - backend_net
     environment:
-      - REACT_APP_API_URL=http://localhost:5000
+      - REACT_APP_API_URL=/api
 
   orchestrator:
     build: ./orchestrator
     ports:
       - "5000:5000"
     depends_on:
-      - message_queue
-      - database
+      message_queue:
+        condition: service_healthy
+      database:
+        condition: service_healthy
     networks:
       - frontend_net
       - backend_net
@@ -64,6 +66,11 @@ services:
       - db_data:/var/lib/postgresql/data
     networks:
       - backend_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   message_queue:
     image: rabbitmq:3-management
@@ -75,6 +82,11 @@ services:
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
     networks:
       - backend_net
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   prometheus:
     image: prom/prometheus
