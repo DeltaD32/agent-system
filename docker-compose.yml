@@ -1,6 +1,25 @@
 version: '3.8'
 
+# =============================================================================
+# AI Agent System — docker-compose
+#
+# Cross-platform: works on Linux (Fedora), macOS, and Windows.
+# All host paths should be set in a .env file (see .env.example).
+#
+# GPU notes
+#   Local GPU  : Ollama runs natively on the host; reachable via
+#                host.docker.internal (Mac/Win) or the gateway IP on Linux.
+#   Remote GPU : A second Ollama instance on your LAN.  Set OLLAMA_REMOTE_URL.
+#
+# Obsidian Vault
+#   Set OBSIDIAN_VAULT_PATH in .env to your vault's host directory.
+#   It is mounted read-write at /vault inside the orchestrator.
+# =============================================================================
+
 services:
+  # ---------------------------------------------------------------------------
+  # Frontend
+  # ---------------------------------------------------------------------------
   ui:
     build: ./ui
     ports:
@@ -13,6 +32,9 @@ services:
     environment:
       - REACT_APP_API_URL=/api
 
+  # ---------------------------------------------------------------------------
+  # Orchestrator (Python / Quart)
+  # ---------------------------------------------------------------------------
   orchestrator:
     build: ./orchestrator
     ports:
@@ -26,16 +48,39 @@ services:
       - frontend_net
       - backend_net
       - ollama_net
+    volumes:
+      # Obsidian vault (read-write)
+      # Linux/Mac: set OBSIDIAN_VAULT_PATH=/home/you/Documents/MyVault
+      # Windows  : set OBSIDIAN_VAULT_PATH=C:/Users/You/Documents/MyVault
+      - ${OBSIDIAN_VAULT_PATH:-./data/vault}:/vault
     environment:
+      # --- Database ---
       - DB_HOST=database
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_NAME=${POSTGRES_DB}
+      # --- Message queue ---
       - RABBITMQ_HOST=message_queue
       - RABBITMQ_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_PASS=${RABBITMQ_DEFAULT_PASS}
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # --- LLM backends ---
+      # Local GPU: on Linux use the Docker bridge gateway instead of
+      # host.docker.internal (which only works on Mac/Win natively).
+      # The setup scripts set OLLAMA_LOCAL_URL automatically per platform.
+      - OLLAMA_LOCAL_URL=${OLLAMA_LOCAL_URL:-http://host.docker.internal:11434}
+      # LAN GPU server (optional)
+      - OLLAMA_REMOTE_URL=${OLLAMA_REMOTE_URL:-}
+      # Preferred local Ollama model
+      - LOCAL_MODEL=${LOCAL_MODEL:-llama3}
+      # Claude API (optional – leave blank to use local only)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-6}
+      # --- Vault mount path inside container ---
+      - VAULT_MOUNT=/vault
 
+  # ---------------------------------------------------------------------------
+  # Worker agents
+  # ---------------------------------------------------------------------------
   worker_agent:
     build: ./worker_agent
     depends_on:
@@ -54,8 +99,11 @@ services:
       - RABBITMQ_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_PASS=${RABBITMQ_DEFAULT_PASS}
 
+  # ---------------------------------------------------------------------------
+  # Database (PostgreSQL)
+  # ---------------------------------------------------------------------------
   database:
-    image: postgres:13
+    image: postgres:15
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -64,6 +112,8 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./orchestrator/migrations:/docker-entrypoint-initdb.d/migrations
     networks:
       - backend_net
     healthcheck:
@@ -72,6 +122,9 @@ services:
       timeout: 5s
       retries: 5
 
+  # ---------------------------------------------------------------------------
+  # Message queue (RabbitMQ)
+  # ---------------------------------------------------------------------------
   message_queue:
     image: rabbitmq:3-management
     ports:
@@ -88,6 +141,9 @@ services:
       timeout: 5s
       retries: 5
 
+  # ---------------------------------------------------------------------------
+  # Monitoring (Prometheus + Grafana)
+  # ---------------------------------------------------------------------------
   prometheus:
     image: prom/prometheus
     volumes:
@@ -125,7 +181,6 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=false
       - GF_AUTH_BASIC_ENABLED=true
       - GF_SECURITY_ALLOW_EMBEDDING=true
-      - GF_LOG_LEVEL=debug
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - grafana_data:/var/lib/grafana
@@ -138,7 +193,6 @@ services:
 
   node-exporter:
     image: prom/node-exporter
-    container_name: node-exporter
     restart: unless-stopped
     expose:
       - 9100
@@ -154,4 +208,4 @@ networks:
 volumes:
   db_data:
   grafana_data:
-  prometheus_data: 
+  prometheus_data:
