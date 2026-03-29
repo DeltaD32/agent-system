@@ -1,0 +1,165 @@
+<h2>Pixel Office Layout &amp; Interactions</h2>
+<p class="subtitle">Section 4 of 4 — 16-bit RPG office, isometric grid, dynamic desks</p>
+
+<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px">
+
+  <!-- Office Map -->
+  <div>
+    <p class="label">Office Floor Plan (isometric view)</p>
+    <div style="background:#3a5c3a;border:3px solid #2a4a2a;border-radius:6px;padding:12px;font-family:monospace;font-size:10px;position:relative;min-height:320px">
+
+      <!-- Floor tiles suggestion -->
+      <div style="position:absolute;inset:0;opacity:0.15;background:repeating-linear-gradient(45deg,#5c8c5c 0px,#5c8c5c 2px,transparent 2px,transparent 14px),repeating-linear-gradient(-45deg,#5c8c5c 0px,#5c8c5c 2px,transparent 2px,transparent 14px);border-radius:4px"></div>
+
+      <!-- PM Desk (center top - prominent) -->
+      <div style="position:absolute;top:16px;left:50%;transform:translateX(-50%);background:#8b5e3c;border:2px solid #3a1f00;padding:6px 10px;border-radius:3px;text-align:center;white-space:nowrap">
+        <div style="color:#FFD700;font-size:11px;text-shadow:1px 1px #000">👑 PROJECT MANAGER</div>
+        <div style="color:#fff8dc;font-size:9px">central dispatch desk</div>
+        <div style="width:8px;height:12px;background:#FFD700;border:1px solid #000;margin:3px auto 0;box-shadow:0 0 4px #FFD700"></div>
+      </div>
+
+      <!-- Archivist (left side) -->
+      <div style="position:absolute;top:18px;left:12px;background:#1a3a3a;border:2px solid #0a5c5c;padding:5px 8px;border-radius:3px;text-align:center">
+        <div style="color:#80DEEA;font-size:10px">📚 ARCHIVIST</div>
+        <div style="width:6px;height:10px;background:#80DEEA;border:1px solid #000;margin:2px auto 0"></div>
+      </div>
+
+      <!-- Reviewer (right side) -->
+      <div style="position:absolute;top:18px;right:12px;background:#3a2a1a;border:2px solid #5c3a0a;padding:5px 8px;border-radius:3px;text-align:center">
+        <div style="color:#FFAB40;font-size:10px">🔍 REVIEWER</div>
+        <div style="width:6px;height:10px;background:#FFAB40;border:1px solid #000;margin:2px auto 0"></div>
+      </div>
+
+      <!-- Middle row: Specialist desks -->
+      <div style="position:absolute;top:110px;left:0;right:0;display:flex;justify-content:space-around;padding:0 8px">
+        <div style="background:#1a2a3a;border:2px solid #0a3a5c;padding:5px 7px;border-radius:3px;text-align:center">
+          <div style="color:#4FC3F7;font-size:10px">💻 CODER</div>
+          <div style="color:#556;font-size:9px">+instances</div>
+          <div style="width:6px;height:10px;background:#4FC3F7;border:1px solid #000;margin:2px auto 0"></div>
+        </div>
+        <div style="background:#3a1a3a;border:2px solid #5c0a5c;padding:5px 7px;border-radius:3px;text-align:center">
+          <div style="color:#F48FB1;font-size:10px">🔬 RESEARCHER</div>
+          <div style="color:#556;font-size:9px">+instances</div>
+          <div style="width:6px;height:10px;background:#F48FB1;border:1px solid #000;margin:2px auto 0"></div>
+        </div>
+        <div style="background:#2a3a1a;border:2px solid #3a5c0a;padding:5px 7px;border-radius:3px;text-align:center">
+          <div style="color:#AED581;font-size:10px">🖥️ SYSADMIN</div>
+          <div style="color:#556;font-size:9px">+instances</div>
+          <div style="width:6px;height:10px;background:#AED581;border:1px solid #000;margin:2px auto 0"></div>
+        </div>
+        <div style="background:#2a1a3a;border:2px solid #3a0a5c;padding:5px 7px;border-radius:3px;text-align:center">
+          <div style="color:#CE93D8;font-size:10px">✍️ WRITER</div>
+          <div style="color:#556;font-size:9px">+instances</div>
+          <div style="width:6px;height:10px;background:#CE93D8;border:1px solid #000;margin:2px auto 0"></div>
+        </div>
+      </div>
+
+      <!-- Bottom row -->
+      <div style="position:absolute;bottom:12px;left:0;right:0;display:flex;justify-content:space-around;padding:0 8px">
+        <div style="background:#3a2a1a;border:2px solid #5c4a0a;padding:4px 6px;border-radius:3px;text-align:center">
+          <div style="color:#FFD54F;font-size:9px">📊 ANALYST</div>
+          <div style="width:5px;height:8px;background:#FFD54F;border:1px solid #000;margin:2px auto 0"></div>
+        </div>
+        <div style="background:#1a3a2a;border:2px solid #0a5c3a;padding:4px 6px;border-radius:3px;text-align:center">
+          <div style="color:#A5D6A7;font-size:9px">📝 DOC SPEC</div>
+          <div style="width:5px;height:8px;background:#A5D6A7;border:1px solid #000;margin:2px auto 0"></div>
+        </div>
+        <div style="background:#3a1a1a;border:2px solid #5c0a0a;padding:4px 6px;border-radius:3px;text-align:center">
+          <div style="color:#EF9A9A;font-size:9px">📢 MARKETING</div>
+          <div style="width:5px;height:8px;background:#EF9A9A;border:1px solid #000;margin:2px auto 0"></div>
+        </div>
+        <div style="background:#1a1a3a;border:2px solid #0a0a5c;padding:4px 6px;border-radius:3px;text-align:center">
+          <div style="color:#90CAF9;font-size:9px">🎨 DESIGNER</div>
+          <div style="width:5px;height:8px;background:#90CAF9;border:1px solid #000;margin:2px auto 0"></div>
+        </div>
+        <!-- Spawn zone -->
+        <div style="background:#0d0d0d;border:2px dashed #333;padding:4px 6px;border-radius:3px;text-align:center">
+          <div style="color:#444;font-size:9px">[ + HIRE ]</div>
+          <div style="color:#333;font-size:8px">open desk</div>
+        </div>
+      </div>
+
+      <!-- Pathfinding arrow example -->
+      <div style="position:absolute;top:85px;left:38%;color:#FFD700;font-size:14px;opacity:0.8;text-shadow:0 0 6px #FFD700">↓</div>
+      <div style="position:absolute;top:95px;left:36%;color:#556;font-size:8px;white-space:nowrap">coder walks to PM</div>
+
+    </div>
+  </div>
+
+  <!-- UI Panels -->
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div>
+      <p class="label">Hire Panel — spawning agents</p>
+      <div style="background:#0a0a1a;border:2px solid #1a3a5c;border-radius:6px;padding:10px;font-family:monospace;font-size:10px;color:#aab">
+        <div style="color:#FFD700;margin-bottom:6px">🧑‍💼 Hire New Agent</div>
+        <div style="background:#0d1a2e;border:1px solid #1a3a5c;padding:4px 6px;border-radius:3px;margin-bottom:4px">
+          Role: <span style="color:#4FC3F7">[ Coder ▾ ]</span>
+        </div>
+        <div style="background:#0d1a2e;border:1px solid #1a3a5c;padding:4px 6px;border-radius:3px;margin-bottom:4px">
+          Specialization: <span style="color:#81C784">Backend / FastAPI</span><span style="color:#556;animation:blink 1s infinite">█</span>
+        </div>
+        <div style="background:#0d1a2e;border:1px solid #1a3a5c;padding:4px 6px;border-radius:3px;margin-bottom:6px">
+          LLM: <span style="color:#CE93D8">[ Auto ▾ ]</span> &nbsp; <span style="color:#556">local / remote / claude</span>
+        </div>
+        <div style="background:#2d6a4f;border:1px solid #3d9a6f;padding:4px;border-radius:3px;text-align:center;color:#fff;cursor:pointer">
+          ▶ Hire Agent
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="label">Agent Card (click desk to open)</p>
+      <div style="background:#0a0a1a;border:2px solid #4FC3F7;border-radius:6px;padding:10px;font-family:monospace;font-size:10px;color:#aab">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="width:16px;height:20px;background:#4FC3F7;border:2px solid #000;flex-shrink:0"></div>
+          <div>
+            <div style="color:#4FC3F7">Coder-2 [Frontend]</div>
+            <div style="color:#556">● working · Svelte · local GPU</div>
+          </div>
+        </div>
+        <div style="background:#0d1a2e;border:1px solid #1a3a5c;padding:4px;border-radius:3px;margin-bottom:4px;color:#81C784">
+          📋 Building dashboard component...
+        </div>
+        <div style="display:flex;gap:4px">
+          <div style="background:#1a3a5c;padding:3px 6px;border-radius:2px;color:#4FC3F7;font-size:9px">💬 Chat</div>
+          <div style="background:#1a3a5c;padding:3px 6px;border-radius:2px;color:#CE93D8;font-size:9px">📂 Vault</div>
+          <div style="background:#3a1a1a;padding:3px 6px;border-radius:2px;color:#ff8a80;font-size:9px">✕ Dismiss</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="label">Sprite States (16-bit RPG)</p>
+      <div style="background:#0a0a1a;border:1px solid #1a3a5c;border-radius:6px;padding:10px;font-size:11px;color:#aab;line-height:2">
+        <div><span style="display:inline-block;width:8px;height:12px;background:#4FC3F7;border:1px solid #000;margin-right:6px;vertical-align:middle"></span><span style="color:#4FC3F7">idle</span> — sitting, subtle bob animation</div>
+        <div><span style="display:inline-block;width:8px;height:12px;background:#81C784;border:1px solid #000;margin-right:6px;vertical-align:middle"></span><span style="color:#81C784">working</span> — typing animation, glow pulse</div>
+        <div><span style="display:inline-block;width:8px;height:12px;background:#FFD700;border:1px solid #000;margin-right:6px;vertical-align:middle"></span><span style="color:#FFD700">walking</span> — A* pathfinding, 4-frame walk cycle</div>
+        <div><span style="display:inline-block;width:8px;height:12px;background:#FF7043;border:1px solid #000;margin-right:6px;vertical-align:middle"></span><span style="color:#FF7043">blocked</span> — exclamation mark, shaking</div>
+        <div><span style="display:inline-block;width:8px;height:12px;background:#CE93D8;border:1px solid #000;margin-right:6px;vertical-align:middle"></span><span style="color:#CE93D8">consulting</span> — speech bubble, at another desk</div>
+        <div><span style="display:inline-block;width:8px;height:12px;background:#90A4AE;border:1px solid #000;margin-right:6px;vertical-align:middle"></span><span style="color:#90A4AE">dismissed</span> — fade + desk disappears</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="background:#0a0a1a;border:1px solid #2d4a2a;border-radius:8px;padding:12px">
+  <p class="label" style="color:#81C784">Pathfinding &amp; Dynamic Desks</p>
+  <div style="font-family:monospace;font-size:11px;color:#aab;line-height:1.9;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div>
+      <div style="color:#4FC3F7">Grid system</div>
+      Isometric tile grid (e.g. 20×14)<br>
+      Each desk occupies 2×2 tiles<br>
+      Walkable tiles recalculated on hire/dismiss<br>
+      A* via <span style="color:#FFD700">pathfinding.js</span> — cheap, no deps
+    </div>
+    <div>
+      <div style="color:#4FC3F7">Dynamic desk allocation</div>
+      Desks assigned from a pool on hire<br>
+      Freed + animated out on dismiss<br>
+      Overflow: new row added if office fills<br>
+      PM desk always fixed at center-top
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:12px">Does the office layout and interaction model look right? Anything to tweak before I write the spec?</p>

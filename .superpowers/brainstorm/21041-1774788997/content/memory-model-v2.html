@@ -1,0 +1,132 @@
+<h2>Agent Memory &amp; Vault Structure</h2>
+<p class="subtitle">Section 2 of 4 — Updated with Reviewer access</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+  <!-- Vault Tree -->
+  <div>
+    <p class="label">Vault Folder Layout</p>
+    <div style="font-family:monospace;font-size:11px;line-height:2;background:#0a0a1a;border:1px solid #1a3a5c;border-radius:8px;padding:16px;color:#c8d0e0">
+      <div style="color:#FFD700">📂 AgentVault/</div>
+      <div style="padding-left:16px">
+        <div style="color:#81C784">📂 shared/</div>
+        <div style="padding-left:16px;color:#556">← all agents read + write<br>&nbsp;&nbsp; project notes, findings,<br>&nbsp;&nbsp; decisions, glossary</div>
+        <br>
+        <div style="color:#4FC3F7">📂 instructions/</div>
+        <div style="padding-left:16px">
+          <div style="color:#aab">📄 project-manager.md</div>
+          <div style="color:#aab">📄 coder.md</div>
+          <div style="color:#aab">📄 researcher.md</div>
+          <div style="color:#aab">📄 sysadmin.md</div>
+          <div style="color:#aab">📄 reviewer.md</div>
+          <div style="color:#556">📄 … (one per role)</div>
+        </div>
+        <div style="color:#556;font-size:10px;padding-left:16px">← role system prompts &amp; rules<br>&nbsp;&nbsp;&nbsp;agents read-only their own file</div>
+        <br>
+        <div style="color:#CE93D8">📂 agents/</div>
+        <div style="padding-left:16px">
+          <div style="color:#FFAB40">📂 project-manager/</div>
+          <div style="color:#4FC3F7">📂 coder/</div>
+          <div style="color:#F48FB1">📂 researcher/</div>
+          <div style="color:#FFAB40">📂 reviewer/</div>
+          <div style="color:#80DEEA">📂 sysadmin/</div>
+          <div style="color:#556">📂 … (one per role)</div>
+        </div>
+        <div style="color:#556;font-size:10px;padding-left:16px">← private per-agent memory<br>&nbsp;&nbsp;&nbsp;read/write own folder only</div>
+        <br>
+        <div style="color:#ff8a80">📂 system/</div>
+        <div style="padding-left:16px;color:#556">← orchestrator metadata<br>&nbsp;&nbsp; agent registry, task log<br>&nbsp;&nbsp; agents read-only</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permission Matrix -->
+  <div>
+    <p class="label">Permission Matrix</p>
+    <div style="font-size:11px;background:#0a0a1a;border:1px solid #1a3a5c;border-radius:8px;padding:16px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-family:monospace">
+        <thead>
+          <tr style="color:#556;font-size:10px;border-bottom:1px solid #1a3a5c">
+            <th style="text-align:left;padding:4px 6px">Agent</th>
+            <th style="padding:4px 4px">shared/</th>
+            <th style="padding:4px 4px">instructions/<br>own</th>
+            <th style="padding:4px 4px">agents/<br>own</th>
+            <th style="padding:4px 4px">agents/<br>others</th>
+            <th style="padding:4px 4px">system/</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="color:#FFAB40;border-bottom:1px solid #111">
+            <td style="padding:4px 6px">PM</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+          </tr>
+          <tr style="color:#80DEEA;border-bottom:1px solid #111">
+            <td style="padding:4px 6px">Archivist</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+          </tr>
+          <tr style="color:#FFAB40;border-bottom:1px solid #111">
+            <td style="padding:4px 6px">Reviewer</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+          </tr>
+          <tr style="color:#81C784;border-bottom:1px solid #111">
+            <td style="padding:4px 6px">Coder</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#ff4444">—</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+          </tr>
+          <tr style="color:#aab;border-bottom:1px solid #111">
+            <td style="padding:4px 6px">All others</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+            <td style="text-align:center;color:#00ff88">RW</td>
+            <td style="text-align:center;color:#ff4444">—</td>
+            <td style="text-align:center;color:#4FC3F7">R</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:8px;color:#556;font-size:10px">
+        RW = read + write &nbsp;·&nbsp; R = read-only &nbsp;·&nbsp; — = no access<br>
+        PM + Archivist + Reviewer can read all agent folders
+      </div>
+    </div>
+
+    <p class="label" style="margin-top:16px">Reviewer's cross-agent read — use cases</p>
+    <div style="font-family:monospace;font-size:11px;background:#0a0a1a;border:1px solid #2d4a2a;border-radius:8px;padding:12px;color:#aab;line-height:1.9">
+      <div><span style="color:#FFAB40">📋 Reviewer</span> inspects before flagging:</div>
+      <div style="padding-left:12px">
+        <div>→ <span style="color:#81C784">agents/coder/session-log.md</span> <span style="color:#556">— what was changed &amp; why</span></div>
+        <div>→ <span style="color:#4FC3F7">agents/researcher/context.md</span> <span style="color:#556">— source material used</span></div>
+        <div>→ <span style="color:#F48FB1">agents/writer/drafts/</span> <span style="color:#556">— previous versions</span></div>
+        <div>→ <span style="color:#CE93D8">agents/sysadmin/toolchain.md</span> <span style="color:#556">— environment context</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:16px;background:#0a0a1a;border:1px solid #2d6a4f;border-radius:8px;padding:12px">
+  <p class="label" style="color:#81C784">How agents check memory before acting</p>
+  <div style="font-family:monospace;font-size:11px;color:#aab;line-height:2">
+    <span style="color:#556">1.</span> Read <span style="color:#4FC3F7">instructions/{role}.md</span> → load role rules &amp; constraints<br>
+    <span style="color:#556">2.</span> Read <span style="color:#CE93D8">agents/{role}/context.md</span> → load private memory<br>
+    <span style="color:#556">3.</span> Search <span style="color:#81C784">shared/</span> → check if answer already exists<br>
+    <span style="color:#556">4.</span> Execute task → write findings back to shared/ or own folder<br>
+    <span style="color:#556">5.</span> Archivist periodically indexes &amp; deduplicates shared/ knowledge
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:12px">✓ Reviewer added. Does this look good to move on to Section 3 — LLM routing &amp; agent prompts?</p>

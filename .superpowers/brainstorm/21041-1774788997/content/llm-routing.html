@@ -1,0 +1,145 @@
+<h2>LLM Routing &amp; Agent Prompt System</h2>
+<p class="subtitle">Section 3 of 4 — How tasks get routed and how agents stay in their stacks</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+  <!-- LLM Router -->
+  <div>
+    <p class="label">LLM Routing Decision Tree</p>
+    <div style="font-family:monospace;font-size:11px;background:#0a0a1a;border:1px solid #1a3a5c;border-radius:8px;padding:14px;color:#c8d0e0;line-height:1.8">
+
+      <div style="color:#aab;margin-bottom:8px">Task arrives at agent →</div>
+
+      <div style="border-left:2px solid #1a3a5c;padding-left:10px;margin-bottom:8px">
+        <div style="color:#FFD700">① Force override set?</div>
+        <div style="padding-left:12px;color:#556">user pinned backend in Hire panel</div>
+        <div style="padding-left:12px">→ <span style="color:#00ff88">use that backend, done</span></div>
+      </div>
+
+      <div style="border-left:2px solid #1a3a5c;padding-left:10px;margin-bottom:8px">
+        <div style="color:#FFD700">② Is local Ollama healthy?</div>
+        <div style="padding-left:12px;color:#556">ping localhost GPU</div>
+        <div style="padding-left:12px">→ <span style="color:#ff8a80">no</span>: try remote Ollama(s) in order</div>
+        <div style="padding-left:12px">→ <span style="color:#ff8a80">all down</span>: fall back to Claude API</div>
+      </div>
+
+      <div style="border-left:2px solid #1a3a5c;padding-left:10px;margin-bottom:8px">
+        <div style="color:#FFD700">③ Task complexity score</div>
+        <div style="padding-left:12px;color:#556">keyword + token-length heuristic</div>
+        <div style="padding-left:12px">
+          <span style="color:#81C784">LOW</span> → local Ollama (fast, private)<br>
+          <span style="color:#FFAB40">MED</span> → best available Ollama<br>
+          <span style="color:#ff8a80">HIGH</span> → Claude API (reasoning tasks)
+        </div>
+      </div>
+
+      <div style="border-left:2px solid #1a3a5c;padding-left:10px">
+        <div style="color:#FFD700">④ Role-based preference</div>
+        <div style="padding-left:12px;color:#556">some roles default to Claude</div>
+        <div style="padding-left:12px">
+          <span style="color:#FFAB40">PM</span> always Claude (planning)<br>
+          <span style="color:#80DEEA">Archivist</span> always local (bulk ops)<br>
+          <span style="color:#4FC3F7">Researcher</span> local first, Claude for synthesis
+        </div>
+      </div>
+    </div>
+
+    <p class="label" style="margin-top:14px">Multi-Ollama Server Config</p>
+    <div style="font-family:monospace;font-size:11px;background:#0a0a1a;border:1px solid #1a3a5c;border-radius:8px;padding:12px;color:#aab;line-height:1.8">
+      <div style="color:#556"># .env — add as many as you have</div>
+      <div>OLLAMA_LOCAL=<span style="color:#81C784">http://localhost:11434</span></div>
+      <div>OLLAMA_REMOTE_1=<span style="color:#81C784">http://192.168.1.50:11434</span></div>
+      <div>OLLAMA_REMOTE_2=<span style="color:#81C784">http://192.168.1.51:11434</span></div>
+      <div>ANTHROPIC_API_KEY=<span style="color:#556">sk-ant-...</span></div>
+      <div style="margin-top:6px;color:#556"># Router probes all on startup, re-checks every 60s</div>
+      <div style="color:#556"># Failed servers are skipped, recovered servers re-added</div>
+    </div>
+  </div>
+
+  <!-- Prompt System -->
+  <div>
+    <p class="label">Agent Prompt Anatomy — "Staying in Their Stack"</p>
+    <div style="font-family:monospace;font-size:10px;background:#0a0a1a;border:1px solid #1a3a5c;border-radius:8px;padding:14px;color:#c8d0e0;line-height:1.7">
+
+      <div style="background:#0d1a0d;border:1px solid #2d6a4f;border-radius:4px;padding:8px;margin-bottom:6px">
+        <div style="color:#81C784;font-size:10px;letter-spacing:1px">LAYER 1 — IDENTITY (never changes)</div>
+        <div style="color:#aab;margin-top:4px">
+          You are <span style="color:#4FC3F7">{role}</span> in an AI agent office.<br>
+          Your specialization: <span style="color:#FFD700">{specialization}</span><br>
+          You ONLY perform tasks within your role.<br>
+          You NEVER impersonate another agent.<br>
+          If asked to do something outside your role,<br>
+          you redirect to the correct specialist.
+        </div>
+      </div>
+
+      <div style="background:#0d0d1a;border:1px solid #2a2a6a;border-radius:4px;padding:8px;margin-bottom:6px">
+        <div style="color:#CE93D8;font-size:10px;letter-spacing:1px">LAYER 2 — INSTRUCTIONS (from vault)</div>
+        <div style="color:#aab;margin-top:4px">
+          <span style="color:#4FC3F7">instructions/{role}.md</span> injected here.<br>
+          Contains: tools allowed, output format,<br>
+          escalation rules, quality standards,<br>
+          which agents to consult for what.
+        </div>
+      </div>
+
+      <div style="background:#1a0d0d;border:1px solid #5c2a2a;border-radius:4px;padding:8px;margin-bottom:6px">
+        <div style="color:#ff8a80;font-size:10px;letter-spacing:1px">LAYER 3 — MEMORY (loaded per task)</div>
+        <div style="color:#aab;margin-top:4px">
+          Context from <span style="color:#CE93D8">agents/{role}/context.md</span><br>
+          Relevant hits from <span style="color:#81C784">shared/</span> search<br>
+          Current project state from PM<br>
+          Previous task output (if chained)
+        </div>
+      </div>
+
+      <div style="background:#1a1a0d;border:1px solid #5c5c2a;border-radius:4px;padding:8px">
+        <div style="color:#FFD700;font-size:10px;letter-spacing:1px">LAYER 4 — TASK (per invocation)</div>
+        <div style="color:#aab;margin-top:4px">
+          The actual task description.<br>
+          Expected output format.<br>
+          Deadline / priority.<br>
+          Which agent requested this.
+        </div>
+      </div>
+    </div>
+
+    <p class="label" style="margin-top:14px">Guardrail Rules (in every instructions/{role}.md)</p>
+    <div style="font-size:11px;background:#0a0a1a;border:1px solid #1a3a5c;border-radius:8px;padding:12px;color:#aab;line-height:1.8">
+      <div><span style="color:#00ff88">✓</span> List of tools this role CAN use</div>
+      <div><span style="color:#ff4444">✗</span> Explicit list of tools this role CANNOT use</div>
+      <div><span style="color:#00ff88">✓</span> Output must always include: confidence score, sources, next recommended agent</div>
+      <div><span style="color:#00ff88">✓</span> If blocked: write blocker to shared/ and notify PM</div>
+      <div><span style="color:#ff4444">✗</span> Never write to another agent's private folder</div>
+      <div><span style="color:#ff4444">✗</span> Never skip the memory-check step</div>
+    </div>
+  </div>
+</div>
+
+<div style="background:#0a0a1a;border:1px solid #2d4a6a;border-radius:8px;padding:14px">
+  <p class="label" style="color:#4FC3F7">Agent-to-Agent Consultation Flow (triggers pathfinding in office)</p>
+  <div style="font-family:monospace;font-size:11px;color:#aab;line-height:2;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div>
+      <div style="color:#81C784">Coder-1 hits a blocker →</div>
+      <div style="padding-left:12px">
+        writes question to <span style="color:#CE93D8">shared/blockers.md</span><br>
+        emits <span style="color:#FFD700">consult_request</span> event<br>
+        sprite walks to Reviewer's desk<br>
+        waits for <span style="color:#00ff88">consult_response</span> event<br>
+        resumes with answer injected into context
+      </div>
+    </div>
+    <div>
+      <div style="color:#FFAB40">PM decomposes a project →</div>
+      <div style="padding-left:12px">
+        spawns N agents with specializations<br>
+        emits <span style="color:#FFD700">agent_hired</span> events (desks appear)<br>
+        assigns tasks via <span style="color:#CE93D8">task_queue</span><br>
+        monitors via <span style="color:#81C784">shared/project-status.md</span><br>
+        dismisses agents when done (<span style="color:#ff8a80">agent_dismissed</span>)
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:12px">Does this routing + prompt system look right? Any roles that need different routing rules?</p>

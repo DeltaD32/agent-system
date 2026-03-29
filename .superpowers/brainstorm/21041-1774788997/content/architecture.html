@@ -1,0 +1,99 @@
+<h2>System Architecture</h2>
+<p class="subtitle">Section 1 of 4 — Does this overall structure look right?</p>
+
+<div style="font-family:monospace;font-size:12px;line-height:1.6;background:#0a0a1a;border:1px solid #1a3a5c;border-radius:8px;padding:20px;color:#c8d0e0">
+
+  <!-- Row 1: Frontend -->
+  <div style="text-align:center;margin-bottom:6px">
+    <span style="background:#1a3a2a;border:1px solid #2d6a4f;color:#81C784;padding:4px 16px;border-radius:4px">
+      🖥️ &nbsp;SVELTE FRONTEND &nbsp;(localhost:5173)
+    </span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:4px">
+    <div style="background:#0d1a2e;border:1px solid #1a3a5c;border-radius:4px;padding:8px;text-align:center;color:#4FC3F7;font-size:11px">
+      🏢 PixiJS Office<br><span style="color:#556;font-size:10px">sprites · pathfinding · desks</span>
+    </div>
+    <div style="background:#0d1a2e;border:1px solid #1a3a5c;border-radius:4px;padding:8px;text-align:center;color:#FFD700;font-size:11px">
+      💬 Chat Panel<br><span style="color:#556;font-size:10px">per-agent + PM chat</span>
+    </div>
+    <div style="background:#0d1a2e;border:1px solid #1a3a5c;border-radius:4px;padding:8px;text-align:center;color:#CE93D8;font-size:11px">
+      🧑‍💼 Hire Panel<br><span style="color:#556;font-size:10px">spawn · assign · dismiss</span>
+    </div>
+  </div>
+
+  <!-- Arrow -->
+  <div style="text-align:center;color:#1a3a5c;margin:4px 0">
+    ▲ WebSocket (real-time events) ▼ &nbsp;&nbsp;&nbsp; ▲ REST API ▼
+  </div>
+
+  <!-- Row 2: Orchestrator -->
+  <div style="text-align:center;margin-bottom:6px">
+    <span style="background:#1a1a3a;border:1px solid #3a3a6a;color:#9b9bf4;padding:4px 16px;border-radius:4px">
+      ⚙️ &nbsp;FASTAPI ORCHESTRATOR &nbsp;(localhost:8000)
+    </span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:4px">
+    <div style="background:#0d0d22;border:1px solid #3a3a6a;border-radius:4px;padding:6px;text-align:center;color:#9b9bf4;font-size:10px">
+      🤖 Agent Manager<br><span style="color:#445;font-size:9px">spawn/kill/assign<br>asyncio tasks</span>
+    </div>
+    <div style="background:#0d0d22;border:1px solid #3a3a6a;border-radius:4px;padding:6px;text-align:center;color:#9b9bf4;font-size:10px">
+      🔀 LLM Router<br><span style="color:#445;font-size:9px">local·remote·claude<br>complexity scoring</span>
+    </div>
+    <div style="background:#0d0d22;border:1px solid #3a3a6a;border-radius:4px;padding:6px;text-align:center;color:#9b9bf4;font-size:10px">
+      🧠 Memory Manager<br><span style="color:#445;font-size:9px">obsidian vault<br>tiered permissions</span>
+    </div>
+    <div style="background:#0d0d22;border:1px solid #3a3a6a;border-radius:4px;padding:6px;text-align:center;color:#9b9bf4;font-size:10px">
+      🛠️ Tool Executor<br><span style="color:#445;font-size:9px">search·browser<br>terminal·files</span>
+    </div>
+  </div>
+
+  <!-- Arrow -->
+  <div style="text-align:center;color:#1a3a5c;margin:4px 0">▼ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ▼ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ▼ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ▼</div>
+
+  <!-- Row 3: Services -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+    <div style="background:#1a0d0d;border:1px solid #5c2a2a;border-radius:4px;padding:6px;text-align:center;color:#ff8a80;font-size:10px">
+      🦙 Ollama (Local GPU)<br>
+      🦙 Ollama (Remote 1)<br>
+      🦙 Ollama (Remote N)<br>
+      <span style="color:#556;font-size:9px">auto-detect · failover</span>
+    </div>
+    <div style="background:#0d1a0d;border:1px solid #2a5c2a;border-radius:4px;padding:6px;text-align:center;color:#80ff80;font-size:10px">
+      🤖 Claude API<br><span style="color:#556;font-size:9px">complex tasks<br>fallback / boost</span>
+    </div>
+    <div style="background:#1a1a0d;border:1px solid #5c5c2a;border-radius:4px;padding:6px;text-align:center;color:#ffff80;font-size:10px">
+      📚 Obsidian Vault<br>
+      <span style="color:#556;font-size:9px">/shared/ (all agents)<br>/agents/{role}/<br>/instructions/{role}/</span>
+    </div>
+    <div style="background:#0d0d1a;border:1px solid #2a2a5c;border-radius:4px;padding:6px;text-align:center;color:#80b0ff;font-size:10px">
+      🔍 SearXNG<br>
+      <span style="color:#556;font-size:9px">auto-detect server<br>or spawn Docker</span><br>
+      🌐 Playwright<br>
+      <span style="color:#556;font-size:9px">full browser control</span>
+    </div>
+  </div>
+
+  <!-- Row 4: Storage -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+    <div style="background:#0d0d0d;border:1px solid #2a2a2a;border-radius:4px;padding:6px;text-align:center;color:#888;font-size:10px">
+      🗄️ SQLite &nbsp;—&nbsp; agents · tasks · projects · sessions
+    </div>
+    <div style="background:#0d0d0d;border:1px solid #2a2a2a;border-radius:4px;padding:6px;text-align:center;color:#888;font-size:10px">
+      ⚡ Redis &nbsp;—&nbsp; pub/sub · task queue · agent state
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:16px" class="section">
+  <p class="label">Key design decisions</p>
+  <ul style="color:#aab;font-size:13px;line-height:1.8">
+    <li><strong style="color:#81C784">One asyncio task per hired agent</strong> — no separate processes, no message broker daemon, agents are lightweight coroutines</li>
+    <li><strong style="color:#4FC3F7">Redis pub/sub</strong> — orchestrator pushes events (agent moved, task started, message sent) to frontend over WebSocket in real time</li>
+    <li><strong style="color:#FFD700">Obsidian vault is the memory layer</strong> — agents read/write markdown files; no vector DB needed (Obsidian search handles retrieval)</li>
+    <li><strong style="color:#CE93D8">LLM routing by task complexity</strong> — simple tasks stay local (Ollama), complex reasoning routes to Claude API</li>
+    <li><strong style="color:#ff8a80">SearXNG auto-discovery</strong> — checks localhost:8080, then your Docker network; spawns a container if neither is reachable</li>
+  </ul>
+</div>
+
+<p class="subtitle" style="margin-top:12px">Does this overall structure look right? Any pieces missing or need adjusting?</p>
