@@ -78,4 +78,9 @@ grafana/data/
 
 # Prometheus
 prometheus/data/
- 
+
+# Local vault placeholder (never commit vault contents)
+data/vault/
+
+# Windows PowerShell
+*.ps1.bak

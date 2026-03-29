@@ -13,16 +13,14 @@ import SystemStatus from './components/SystemStatus';
 import AuthService from './services/AuthService';
 import ErrorBoundary from './components/ErrorBoundary';
 import { NotificationProvider } from './context/NotificationContext';
+import OfficePage from './components/OfficePage';
 
-// Create theme
 const theme = createTheme({
   palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
+    type: 'dark',
+    primary:   { main: '#00f5ff' },
+    secondary: { main: '#FFD700' },
+    background: { default: '#06060f', paper: '#0d0d22' },
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
@@ -48,10 +46,7 @@ function App() {
   const classes = useStyles({ isAuthenticated });
 
   useEffect(() => {
-    const handleAuthChange = () => {
-      setIsAuthenticated(AuthService.isAuthenticated());
-    };
-
+    const handleAuthChange = () => setIsAuthenticated(AuthService.isAuthenticated());
     window.addEventListener('auth-change', handleAuthChange);
     return () => window.removeEventListener('auth-change', handleAuthChange);
   }, []);
@@ -66,6 +61,8 @@ function App() {
               <main className={classes.content}>
                 <Switch>
                   <Route exact path="/login" component={Login} />
+                  {/* Agent HQ — pixel office + chat */}
+                  <ProtectedRoute exact path="/office" component={OfficePage} />
                   <ProtectedRoute exact path="/" component={Dashboard} />
                   <ProtectedRoute exact path="/projects" component={Projects} />
                   <ProtectedRoute exact path="/projects/new" component={Projects} />
@@ -84,4 +81,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

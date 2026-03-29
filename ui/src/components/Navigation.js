@@ -7,6 +7,7 @@ import BubbleChartIcon from '@material-ui/icons/BubbleChart';
 import TimelineIcon from '@material-ui/icons/Timeline';
 import SettingsIcon from '@material-ui/icons/Settings';
 import ExitToAppIcon from '@material-ui/icons/ExitToApp';
+import BusinessIcon from '@material-ui/icons/Business';
 import AuthService from '../services/AuthService';
 
 const useStyles = makeStyles((theme) => ({
@@ -96,6 +97,15 @@ function Navigation() {
             startIcon={<TimelineIcon />}
           >
             Metrics
+          </Button>
+          <Button
+            component={RouterLink}
+            to="/office"
+            className={classes.menuButton}
+            startIcon={<BusinessIcon />}
+            style={{ color: '#00f5ff' }}
+          >
+            Agent HQ
           </Button>
         </div>
         <div className={classes.rightButtons}>
