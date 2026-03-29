@@ -80,10 +80,11 @@ async def test_discover_searxng_falls_through_to_docker_gateway():
         probe_calls.append(url)
         return url == "http://172.17.0.1:8080"
     with patch("backend.tools.search._probe", side_effect=fake_probe), \
-         patch("backend.tools.search._spawn_searxng", new_callable=AsyncMock, return_value=None):
+         patch("backend.tools.search._spawn_searxng", new_callable=AsyncMock, return_value=None) as mock_spawn:
         url = await discover_searxng()
     assert url == "http://172.17.0.1:8080"
     assert "http://localhost:8080" in probe_calls
+    mock_spawn.assert_not_called()
 
 @pytest.mark.asyncio
 async def test_discover_searxng_returns_none_when_all_fail():
@@ -96,6 +97,14 @@ async def test_discover_searxng_returns_none_when_all_fail():
 @pytest.mark.asyncio
 async def test_spawn_searxng_returns_none_when_docker_not_installed():
     """_spawn_searxng returns None gracefully when docker package is missing."""
-    with patch.dict("sys.modules", {"docker": None}):
+    import builtins
+    real_import = builtins.__import__
+
+    def patched_import(name, *args, **kwargs):
+        if name == "docker":
+            raise ImportError("No module named 'docker'")
+        return real_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=patched_import):
         result = await _spawn_searxng()
     assert result is None

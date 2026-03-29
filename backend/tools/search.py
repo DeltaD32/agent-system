@@ -78,10 +78,11 @@ async def _spawn_searxng() -> str | None:
                     url = f"http://localhost:{host_port}"
                     if await _probe(url):
                         logger.info(f"Found existing SearXNG container at {url}")
+                        client.close()
                         return url
         # Spawn new container
         logger.info("Spawning SearXNG container...")
-        client.containers.run(
+        container = client.containers.run(
             "searxng/searxng:latest",
             detach=True,
             ports={"8080/tcp": 8080},
@@ -92,8 +93,14 @@ async def _spawn_searxng() -> str | None:
             await asyncio.sleep(1)
             if await _probe("http://localhost:8080"):
                 logger.info("SearXNG container ready at http://localhost:8080")
+                client.close()
                 return "http://localhost:8080"
         logger.warning("SearXNG container spawned but did not become ready in time")
+        try:
+            container.stop(timeout=5)
+        except Exception:
+            pass
+        client.close()
         return None
     except ImportError:
         logger.warning("docker package not installed — cannot auto-spawn SearXNG")
