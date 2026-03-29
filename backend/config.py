@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env", frozen=False)
 
     ollama_local: str = "http://localhost:11434"
     ollama_remotes: list[str] = []
@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     db_path: str = "./agent-office.db"
     max_concurrent_agents: int = 6
     playwright_headful: bool = False
+    searxng_url: Optional[str] = None   # set from .env or auto-discovered at startup
 
     ollama_remote_1: Optional[str] = None
     ollama_remote_2: Optional[str] = None
