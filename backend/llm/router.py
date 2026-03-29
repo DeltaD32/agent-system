@@ -29,7 +29,7 @@ def complexity_score(prompt: str) -> int:
     """0-100. >=50 means route to Claude."""
     words = prompt.lower().split()
     keyword_hits = sum(1 for w in words if w in COMPLEX_KEYWORDS)
-    length_score = min(len(words) / 12, 1.0)   # 600+ words → 1.0
+    length_score = min(len(words) / 600, 1.0)   # 600+ words → 1.0
     return int((keyword_hits * 15 + length_score * 50))
 
 
@@ -73,6 +73,7 @@ class LLMRouter:
             best = await self._best_ollama_url()
             if best:
                 return await self._call_ollama(prompt, *best)
+            raise RuntimeError("Ollama forced via llm_override but no Ollama server is available.")
 
         # 2. Role-based default
         if role in ALWAYS_CLAUDE:

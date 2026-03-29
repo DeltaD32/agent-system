@@ -38,7 +38,8 @@ async def test_router_uses_local_for_archivist():
         local_model="llama3",
     )
     with patch.object(router, "_call_ollama", new_callable=AsyncMock) as mock_ollama, \
-         patch.object(router, "_local_healthy", new_callable=AsyncMock, return_value=True):
+         patch.object(router, "_best_ollama_url", new_callable=AsyncMock,
+                      return_value=("http://localhost:11434", "local_ollama")):
         mock_ollama.return_value = LLMResponse("ok", "local_ollama", "llama3")
         result = await router.complete(
             prompt="Index the vault",
