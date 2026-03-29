@@ -1,9 +1,11 @@
 import pytest
+import pytest_asyncio
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from vault_init.setup import scaffold_vault, ROLE_INSTRUCTIONS
+from backend.agents.roles import AgentRole
 
 def test_scaffold_creates_all_folders(tmp_path):
     scaffold_vault(tmp_path)
@@ -64,3 +66,40 @@ def test_role_instructions_covers_all_11_roles(tmp_path):
         assert path.exists(), f"Missing instructions/{slug}.md"
         content = path.read_text()
         assert len(content) > 200, f"instructions/{slug}.md seems too short"
+
+from backend.memory.vault import VaultManager
+
+@pytest_asyncio.fixture
+async def vault(tmp_path):
+    from vault_init.setup import scaffold_vault
+    scaffold_vault(tmp_path)
+    return VaultManager(tmp_path)
+
+@pytest.mark.asyncio
+async def test_coder_can_write_own_folder(vault):
+    await vault.write(AgentRole.CODER, "agents/coder/context.md", "# Context\ntest")
+    content = await vault.read(AgentRole.CODER, "agents/coder/context.md")
+    assert "test" in content
+
+@pytest.mark.asyncio
+async def test_coder_cannot_write_others_folder(vault):
+    with pytest.raises(PermissionError):
+        await vault.write(AgentRole.CODER, "agents/researcher/context.md", "hacked")
+
+@pytest.mark.asyncio
+async def test_coder_cannot_read_others_folder(vault):
+    with pytest.raises(PermissionError):
+        await vault.read(AgentRole.CODER, "agents/researcher/context.md")
+
+@pytest.mark.asyncio
+async def test_reviewer_can_read_coder_folder(vault):
+    await vault.write(AgentRole.CODER, "agents/coder/context.md", "coder context")
+    content = await vault.read(AgentRole.REVIEWER, "agents/coder/context.md")
+    assert "coder context" in content
+
+@pytest.mark.asyncio
+async def test_search_shared(vault):
+    await vault.write(AgentRole.CODER, "shared/glossary.md", "# Glossary\nFastAPI: web framework")
+    results = await vault.search(AgentRole.CODER, "FastAPI")
+    assert len(results) > 0
+    assert any("FastAPI" in r["content"] for r in results)
