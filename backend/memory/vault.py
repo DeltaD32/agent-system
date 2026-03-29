@@ -3,18 +3,20 @@ VaultManager — reads and writes the AgentVault with permission enforcement.
 All paths are relative to vault_root (e.g. "shared/glossary.md").
 """
 import asyncio
+import logging
 from pathlib import Path
 from backend.agents.roles import AgentRole
 from backend.memory.permissions import can_read, can_write, resolve_vault_path
+
+logger = logging.getLogger(__name__)
 
 class VaultManager:
     def __init__(self, vault_root: Path):
         self.root = vault_root
 
     def _resolve(self, rel_path: str) -> Path:
-        # Prevent path traversal
         target = (self.root / rel_path).resolve()
-        if not str(target).startswith(str(self.root.resolve())):
+        if not target.is_relative_to(self.root.resolve()):
             raise ValueError(f"Path traversal attempt: {rel_path}")
         return target
 
@@ -37,7 +39,8 @@ class VaultManager:
 
     async def append(self, role: AgentRole, rel_path: str, content: str) -> None:
         existing = await self.read(role, rel_path)
-        await self.write(role, rel_path, existing + "\n" + content)
+        separator = "\n" if existing else ""
+        await self.write(role, rel_path, existing + separator + content)
 
     async def search(self, role: AgentRole, query: str) -> list[dict]:
         """
@@ -58,8 +61,10 @@ class VaultManager:
                     text = fpath.read_text(encoding="utf-8")
                     if query_lower in text.lower():
                         hits.append({"path": rel_str, "content": text})
-                except Exception:
+                except UnicodeDecodeError:
                     pass
+                except Exception as exc:
+                    logger.warning("vault search: could not read %s: %s", fpath, exc)
             return hits
 
         return await asyncio.to_thread(_scan)
