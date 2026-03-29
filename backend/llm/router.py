@@ -30,7 +30,7 @@ def complexity_score(prompt: str) -> int:
     words = prompt.lower().split()
     keyword_hits = sum(1 for w in words if w in COMPLEX_KEYWORDS)
     length_score = min(len(words) / 600, 1.0)   # 600+ words → 1.0
-    return int((keyword_hits * 15 + length_score * 50))
+    return min(int((keyword_hits * 15 + length_score * 50)), 100)
 
 
 class LLMRouter:
@@ -38,12 +38,6 @@ class LLMRouter:
         self.local_url   = local_url
         self.remote_urls = remote_urls
         self.local_model = local_model
-        self._health_cache: dict[str, bool] = {}
-
-    async def _local_healthy(self) -> bool:
-        ok = await check_ollama_health(self.local_url)
-        self._health_cache["local"] = ok
-        return ok
 
     async def _best_ollama_url(self) -> tuple[str, str] | None:
         """Return (url, label) for first healthy Ollama, or None."""
@@ -69,11 +63,15 @@ class LLMRouter:
         # 1. Force override
         if llm_override == "claude_api":
             return await self._call_claude(prompt)
-        if llm_override in ("local_ollama", "remote_ollama"):
-            best = await self._best_ollama_url()
-            if best:
-                return await self._call_ollama(prompt, *best)
-            raise RuntimeError("Ollama forced via llm_override but no Ollama server is available.")
+        if llm_override == "local_ollama":
+            if await check_ollama_health(self.local_url):
+                return await self._call_ollama(prompt, self.local_url, "local_ollama")
+            raise RuntimeError("local_ollama forced via llm_override but local Ollama is not available.")
+        if llm_override == "remote_ollama":
+            for i, url in enumerate(self.remote_urls, start=1):
+                if await check_ollama_health(url):
+                    return await self._call_ollama(prompt, url, f"remote_ollama_{i}")
+            raise RuntimeError("remote_ollama forced via llm_override but no remote Ollama is available.")
 
         # 2. Role-based default
         if role in ALWAYS_CLAUDE:
@@ -82,6 +80,7 @@ class LLMRouter:
             best = await self._best_ollama_url()
             if best:
                 return await self._call_ollama(prompt, *best)
+            raise RuntimeError(f"{role} requires local Ollama but no Ollama server is available.")
 
         # 3. Complexity routing
         score = complexity_score(prompt)
