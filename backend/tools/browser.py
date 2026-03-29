@@ -33,28 +33,31 @@ async def browse(
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=not headful)
-            page = await browser.new_page()
-            await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
-            title = await page.title()
-            text = await page.inner_text("body")
+            try:
+                page = await browser.new_page()
+                await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+                title = await page.title()
+                text = await page.inner_text("body")
 
-            screenshot_path: str | None = None
-            if vault_root is not None:
-                ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-                slug = re.sub(r"[^\w]", "-", url[:50]).strip("-")
-                dest = vault_root / "shared" / "research" / f"{ts}-{slug}.png"
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                await page.screenshot(path=str(dest))
-                screenshot_path = str(dest)
+                screenshot_path: str | None = None
+                if vault_root is not None:
+                    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                    slug = re.sub(r"[^\w]", "-", url[:50]).strip("-")
+                    dest = vault_root / "shared" / "research" / f"{ts}-{slug}.png"
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    await page.screenshot(path=str(dest))
+                    screenshot_path = str(dest)
 
-            await browser.close()
+                return BrowseResult(
+                    url=url,
+                    title=title,
+                    text=text[:5000],
+                    screenshot_path=screenshot_path,
+                )
+            finally:
+                await browser.close()
 
+    except RuntimeError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"Browse failed for {url}: {exc}") from exc
-
-    return BrowseResult(
-        url=url,
-        title=title,
-        text=text[:5000],  # cap at 5000 chars to keep prompts manageable
-        screenshot_path=screenshot_path,
-    )

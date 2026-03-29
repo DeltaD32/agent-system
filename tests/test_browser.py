@@ -89,3 +89,5 @@ async def test_browse_raises_on_navigation_error():
     with patch("backend.tools.browser.async_playwright", return_value=mock_playwright):
         with pytest.raises(RuntimeError, match="Browse failed"):
             await browse("http://example.com")
+
+    mock_browser.close.assert_called_once()
