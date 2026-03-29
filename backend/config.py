@@ -1,10 +1,12 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 from typing import Optional
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env")
+
     ollama_local: str = "http://localhost:11434"
-    ollama_remotes: list[str] = []   # populated from OLLAMA_REMOTE_1..N below
+    ollama_remotes: list[str] = []
     anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-6"
     local_model: str = "llama3"
@@ -14,13 +16,12 @@ class Settings(BaseSettings):
     max_concurrent_agents: int = 6
     playwright_headful: bool = False
 
-    # Collect OLLAMA_REMOTE_1..N into ollama_remotes at init
     ollama_remote_1: Optional[str] = None
     ollama_remote_2: Optional[str] = None
     ollama_remote_3: Optional[str] = None
     ollama_remote_4: Optional[str] = None
 
-    def model_post_init(self, __context):
+    def model_post_init(self, _context) -> None:
         remotes = [
             self.ollama_remote_1,
             self.ollama_remote_2,
@@ -28,8 +29,5 @@ class Settings(BaseSettings):
             self.ollama_remote_4,
         ]
         self.ollama_remotes = [r for r in remotes if r]
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()
