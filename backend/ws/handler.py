@@ -11,7 +11,6 @@ Event types published to Redis channel "agent_events":
   consult_response     {from_agent_id, to_agent_id, answer}
   snapshot             {agents: [...]}   — sent on WS connect
 """
-import asyncio
 import json
 import logging
 from fastapi import WebSocket, WebSocketDisconnect

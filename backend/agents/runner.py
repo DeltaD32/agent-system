@@ -146,6 +146,7 @@ class AgentRunner:
                 "shared/blockers.md",
                 f"## {datetime.now(timezone.utc).isoformat()} — {self.name}\n{e}",
             )
+            await publish("agent_status_updated", {"id": self.agent_id, "status": "idle"})
             return
 
         # Write session log
