@@ -4,13 +4,14 @@ AgentRunner — asyncio coroutine that drives a single agent.
 Lifecycle:
   1. Load prompt layers (identity → instructions → memory → task)
   2. Call LLM router
-  3. Parse response
-  4. Write memory updates to vault
-  5. Emit WebSocket events
-  6. Return to idle or handle consult requests
+  3. Parse tool calls from response (if toolkit available)
+  4. Execute tools, re-call LLM with results (max 3 rounds)
+  5. Write memory updates to vault
+  6. Emit WebSocket events
 """
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from backend.agents.roles import AgentRole, role_vault_folder, ROLE_CONFIG
 from backend.llm.router import LLMRouter
@@ -18,6 +19,17 @@ from backend.memory.vault import VaultManager
 from backend.ws.handler import publish
 
 logger = logging.getLogger(__name__)
+
+# Matches: TOOL_CALL: toolname("argument")
+_TOOL_CALL_RE = re.compile(r'TOOL_CALL:\s*(\w+)\("([^"]*)"\)')
+
+MAX_TOOL_ROUNDS = 3
+
+
+def _parse_tool_call(text: str) -> tuple[str, str] | None:
+    """Return (tool_name, argument) from first TOOL_CALL marker, or None."""
+    m = _TOOL_CALL_RE.search(text)
+    return (m.group(1), m.group(2)) if m else None
 
 
 def assemble_prompt(
@@ -76,16 +88,18 @@ class AgentRunner:
         llm_override: str | None,
         router: LLMRouter,
         vault: VaultManager,
+        toolkit=None,   # ToolKit | None — imported lazily to avoid circular imports
     ):
-        self.agent_id     = agent_id
-        self.name         = name
-        self.role         = role
+        self.agent_id       = agent_id
+        self.name           = name
+        self.role           = role
         self.specialization = specialization
-        self.llm_override = llm_override
-        self.router       = router
-        self.vault        = vault
+        self.llm_override   = llm_override
+        self.router         = router
+        self.vault          = vault
+        self.toolkit        = toolkit
         self._task_queue: asyncio.Queue = asyncio.Queue()
-        self._running     = True
+        self._running       = True
 
     async def assign_task(self, task_id: str, description: str, requested_by: str = "user"):
         await self._task_queue.put((task_id, description, requested_by))
@@ -108,7 +122,6 @@ class AgentRunner:
     async def _execute_task(self, task_id: str, description: str, requested_by: str):
         role_slug = role_vault_folder(self.role)
 
-        # Emit working status
         await publish("agent_status_updated", {"id": self.agent_id, "status": "working"})
         await publish("agent_task_assigned", {
             "id": self.agent_id, "task_id": task_id, "description": description
@@ -121,7 +134,6 @@ class AgentRunner:
         context     = await self.vault.read(self.role, f"agents/{role_slug}/context.md")
         shared_hits = await self.vault.search(self.role, description[:100])
 
-        # Assemble + call LLM
         prompt = assemble_prompt(
             role=self.role,
             specialization=self.specialization,
@@ -138,6 +150,15 @@ class AgentRunner:
                 role=self.role,
                 llm_override=self.llm_override,
             )
+            # Run tool loop if toolkit is available
+            if self.toolkit is not None:
+                final_text = await self._run_tool_loop(prompt, response.text)
+                response = type(response)(
+                    text=final_text,
+                    backend=response.backend,
+                    model=response.model,
+                    tokens_used=response.tokens_used,
+                )
         except Exception as e:
             logger.error(f"Agent {self.name} LLM error: {e}")
             await publish("agent_status_updated", {"id": self.agent_id, "status": "blocked"})
@@ -149,7 +170,6 @@ class AgentRunner:
             await publish("agent_status_updated", {"id": self.agent_id, "status": "idle"})
             return
 
-        # Write session log
         entry = (
             f"## {datetime.now(timezone.utc).isoformat()}\n"
             f"**Task:** {description}\n"
@@ -158,7 +178,6 @@ class AgentRunner:
         )
         await self.vault.append(self.role, f"agents/{role_slug}/session-log.md", entry)
 
-        # Check for consult request in response
         if "CONSULT_REQUEST:" in response.text:
             await publish("consult_request", {
                 "from_agent_id": self.agent_id,
@@ -166,6 +185,68 @@ class AgentRunner:
             })
 
         await publish("agent_status_updated", {"id": self.agent_id, "status": "idle"})
+
+    async def _run_tool_loop(self, original_prompt: str, response_text: str) -> str:
+        """Execute TOOL_CALL markers in response text, up to MAX_TOOL_ROUNDS re-calls."""
+        prompt = original_prompt
+        text   = response_text
+
+        for _ in range(MAX_TOOL_ROUNDS):
+            parsed = _parse_tool_call(text)
+            if parsed is None:
+                break
+            tool_name, arg = parsed
+            tool_result = await self._call_tool(tool_name, arg)
+            prompt = (
+                prompt
+                + f"\n\n---\nTool result for {tool_name}(\"{arg}\"):\n{tool_result}"
+                + "\n\nNow provide your final answer incorporating the tool result:"
+            )
+            response = await self.router.complete(
+                prompt=prompt,
+                role=self.role,
+                llm_override=self.llm_override,
+            )
+            text = response.text
+
+        return text
+
+    async def _call_tool(self, tool_name: str, arg: str) -> str:
+        """Dispatch to the appropriate tool. Returns a string result for the LLM."""
+        if self.toolkit is None:
+            return f"[No toolkit available — cannot run {tool_name}]"
+
+        allowed = self.toolkit.allowed_for(self.role)
+        if tool_name not in allowed:
+            return f"[Tool '{tool_name}' is not permitted for {self.role.value} or not available]"
+
+        try:
+            if tool_name == "search" and self.toolkit.search:
+                results = await self.toolkit.search(arg)
+                return "\n".join(
+                    f"- [{r.title}]({r.url}): {r.snippet}"
+                    for r in results
+                ) or "(no results)"
+
+            if tool_name == "browse" and self.toolkit.browse:
+                result = await self.toolkit.browse(arg)
+                return f"**{result.title}**\n{result.text}"
+
+            if tool_name == "terminal" and self.toolkit.terminal:
+                result = await self.toolkit.terminal(arg)
+                lines = []
+                if result.stdout:
+                    lines.append(f"stdout:\n{result.stdout}")
+                if result.stderr:
+                    lines.append(f"stderr:\n{result.stderr}")
+                lines.append(f"exit code: {result.returncode}")
+                return "\n".join(lines)
+
+        except Exception as exc:
+            logger.warning(f"Tool {tool_name}({arg!r}) failed: {exc}")
+            return f"[Tool error: {exc}]"
+
+        return f"[Unknown tool: {tool_name}]"
 
     def stop(self):
         self._running = False
