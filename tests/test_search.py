@@ -2,7 +2,7 @@
 import pytest
 import httpx
 from unittest.mock import AsyncMock, patch, MagicMock
-from backend.tools.search import SearchResult, SearXNGClient, discover_searxng, _probe
+from backend.tools.search import SearchResult, SearXNGClient, discover_searxng, _probe, _spawn_searxng
 
 def test_search_result_fields():
     r = SearchResult(title="T", url="http://x.com", snippet="S")
@@ -91,3 +91,11 @@ async def test_discover_searxng_returns_none_when_all_fail():
          patch("backend.tools.search._spawn_searxng", new_callable=AsyncMock, return_value=None):
         url = await discover_searxng()
     assert url is None
+
+
+@pytest.mark.asyncio
+async def test_spawn_searxng_returns_none_when_docker_not_installed():
+    """_spawn_searxng returns None gracefully when docker package is missing."""
+    with patch.dict("sys.modules", {"docker": None}):
+        result = await _spawn_searxng()
+    assert result is None
