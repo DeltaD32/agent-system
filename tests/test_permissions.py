@@ -28,3 +28,11 @@ def test_reviewer_cannot_write_system():
 
 def test_pm_can_write_system():
     assert can_write(AgentRole.PROJECT_MANAGER, VaultPath.SYSTEM)
+
+def test_no_agent_can_write_instructions():
+    from backend.memory.permissions import VaultPath
+    for role in AgentRole:
+        assert not can_write(role, VaultPath.INSTRUCTIONS)
+
+def test_archivist_can_write_system():
+    assert can_write(AgentRole.ARCHIVIST, VaultPath.SYSTEM)
