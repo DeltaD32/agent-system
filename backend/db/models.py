@@ -15,7 +15,7 @@ class AgentRow(Base):
     llm_backend   = Column(String, default="auto")   # auto/local_ollama/remote_ollama/claude_api
     desk_col      = Column(Integer, default=0)
     desk_row      = Column(Integer, default=0)
-    created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class TaskRow(Base):
     __tablename__ = "tasks"
@@ -26,8 +26,8 @@ class TaskRow(Base):
     priority      = Column(Integer, default=1)
     requested_by  = Column(String, default="user")     # user or agent_id
     result        = Column(Text, default="")
-    created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    completed_at  = Column(DateTime, nullable=True)
+    created_at    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at  = Column(DateTime(timezone=True), nullable=True)
 
 class ProjectRow(Base):
     __tablename__ = "projects"
@@ -35,4 +35,4 @@ class ProjectRow(Base):
     name          = Column(String, nullable=False)
     description   = Column(Text, default="")
     status        = Column(String, default="active")
-    created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
