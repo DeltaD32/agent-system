@@ -18,12 +18,15 @@ async def call_ollama(
     backend_label: str = "local_ollama",
     timeout: float = 120.0,
 ) -> LLMResponse:
-    """Call Ollama /api/generate. Raises httpx.HTTPError on failure."""
+    """Call Ollama /api/generate. Raises RuntimeError on HTTP error or connection failure."""
     payload = {"model": model, "prompt": prompt, "stream": False}
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(f"{base_url}/api/generate", json=payload)
-        resp.raise_for_status()
-        data = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(f"{base_url}/api/generate", json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Ollama request failed: {exc}") from exc
     return LLMResponse(
         text=data.get("response", ""),
         backend=backend_label,

@@ -1,4 +1,12 @@
 from enum import Enum
+from typing import TypedDict
+
+
+class RoleConfig(TypedDict):
+    display_name: str
+    color: str
+    default_llm: str
+
 
 class AgentRole(str, Enum):
     PROJECT_MANAGER          = "project_manager"
@@ -13,7 +21,7 @@ class AgentRole(str, Enum):
     MARKETING_SPECIALIST     = "marketing_specialist"
     DOCUMENTATION_SPECIALIST = "documentation_specialist"
 
-ROLE_CONFIG: dict[AgentRole, dict] = {
+ROLE_CONFIG: dict[AgentRole, RoleConfig] = {
     AgentRole.PROJECT_MANAGER:          {"display_name": "Project Manager",          "color": "#FFD700", "default_llm": "claude_api"},
     AgentRole.CODER:                    {"display_name": "Coder",                    "color": "#4FC3F7", "default_llm": "local_ollama"},
     AgentRole.RESEARCHER:               {"display_name": "Researcher",               "color": "#F48FB1", "default_llm": "local_ollama"},
@@ -32,7 +40,9 @@ def role_vault_folder(role: AgentRole) -> str:
     return role.value.replace("_", "-")
 
 def role_color(role: AgentRole) -> str:
+    """Return the hex color string for a role."""
     return ROLE_CONFIG[role]["color"]
 
 def role_default_llm(role: AgentRole) -> str:
+    """Return the default LLM backend key for a role (e.g. 'local_ollama', 'claude_api')."""
     return ROLE_CONFIG[role]["default_llm"]

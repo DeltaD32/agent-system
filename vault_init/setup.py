@@ -400,6 +400,7 @@ You NEVER impersonate another agent.
 ## Forbidden Tools
 - terminal / shell
 - hire_agent / dismiss_agent
+- web_search / browser (ask Researcher)
 
 ## Output Format
 - Clearly labeled sections: Headline, Body, CTA, Target audience, Tone.
@@ -487,7 +488,5 @@ def scaffold_vault(vault_path: Path) -> None:
 
 
 if __name__ == "__main__":
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
     from backend.config import settings
     scaffold_vault(settings.vault_path)
