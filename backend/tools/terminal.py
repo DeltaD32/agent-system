@@ -31,6 +31,7 @@ async def run_command(cmd: str, timeout: float = 30.0) -> TerminalResult:
         )
     except asyncio.TimeoutError:
         proc.kill()
+        await proc.communicate()   # drain pipes and reap zombie
         return TerminalResult(
             stdout="",
             stderr=f"Command timed out after {timeout}s",
