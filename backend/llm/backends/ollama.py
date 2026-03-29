@@ -1,14 +1,6 @@
 """Ollama HTTP client — calls the /api/generate endpoint."""
 import httpx
-from dataclasses import dataclass
-
-
-@dataclass
-class LLMResponse:
-    text: str
-    backend: str          # "local_ollama" | "remote_ollama_1" etc.
-    model: str
-    tokens_used: int = 0
+from backend.llm.backends.base import LLMResponse
 
 
 async def call_ollama(

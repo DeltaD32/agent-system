@@ -3,7 +3,8 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.llm.backends.ollama import LLMResponse, call_ollama, check_ollama_health
+from backend.llm.backends.base import LLMResponse
+from backend.llm.backends.ollama import call_ollama, check_ollama_health
 from backend.llm.backends.claude import call_claude, claude_available
 
 
@@ -125,20 +126,23 @@ async def test_check_ollama_health_connection_refused():
 @pytest.mark.asyncio
 async def test_call_claude_success():
     mock_content = MagicMock()
+    mock_content.type = "text"
     mock_content.text = "Sure, here is the answer."
     mock_message = MagicMock()
     mock_message.content = [mock_content]
     mock_message.usage.input_tokens = 10
     mock_message.usage.output_tokens = 20
 
-    mock_anthropic = AsyncMock()
-    mock_anthropic.messages.create = AsyncMock(return_value=mock_message)
+    mock_anthropic_instance = AsyncMock()
+    mock_anthropic_instance.messages.create = AsyncMock(return_value=mock_message)
+    mock_anthropic_instance.__aenter__ = AsyncMock(return_value=mock_anthropic_instance)
+    mock_anthropic_instance.__aexit__ = AsyncMock(return_value=False)
 
     with patch("backend.llm.backends.claude.settings") as mock_settings, \
          patch("backend.llm.backends.claude.anthropic.AsyncAnthropic") as mock_cls:
         mock_settings.anthropic_api_key = "sk-ant-test"
         mock_settings.claude_model = "claude-sonnet-4-6"
-        mock_cls.return_value = mock_anthropic
+        mock_cls.return_value = mock_anthropic_instance
 
         result = await call_claude("What is 2+2?")
 
@@ -151,20 +155,23 @@ async def test_call_claude_success():
 @pytest.mark.asyncio
 async def test_call_claude_uses_override_model():
     mock_content = MagicMock()
+    mock_content.type = "text"
     mock_content.text = "response"
     mock_message = MagicMock()
     mock_message.content = [mock_content]
     mock_message.usage.input_tokens = 5
     mock_message.usage.output_tokens = 5
 
-    mock_anthropic = AsyncMock()
-    mock_anthropic.messages.create = AsyncMock(return_value=mock_message)
+    mock_anthropic_instance = AsyncMock()
+    mock_anthropic_instance.messages.create = AsyncMock(return_value=mock_message)
+    mock_anthropic_instance.__aenter__ = AsyncMock(return_value=mock_anthropic_instance)
+    mock_anthropic_instance.__aexit__ = AsyncMock(return_value=False)
 
     with patch("backend.llm.backends.claude.settings") as mock_settings, \
          patch("backend.llm.backends.claude.anthropic.AsyncAnthropic") as mock_cls:
         mock_settings.anthropic_api_key = "sk-ant-test"
         mock_settings.claude_model = "claude-sonnet-4-6"
-        mock_cls.return_value = mock_anthropic
+        mock_cls.return_value = mock_anthropic_instance
 
         result = await call_claude("prompt", model="claude-opus-4-6")
 
