@@ -130,3 +130,11 @@ async def test_cannot_hire_unknown_role(live_app):
     async with AsyncClient(transport=ASGITransport(live_app), base_url="http://test") as client:
         resp = await client.post("/agents/hire", json={"role": "wizard"})
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_health_includes_searxng_field(live_app):
+    async with AsyncClient(transport=ASGITransport(live_app), base_url="http://test") as client:
+        resp = await client.get("/health")
+    assert resp.status_code == 200
+    assert "searxng" in resp.json()

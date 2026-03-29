@@ -32,11 +32,13 @@ class AgentManager:
         vault: VaultManager,
         router: LLMRouter,
         max_agents: int = 6,
+        toolkit=None,   # ToolKit | None
     ):
         self._db      = db_session
         self._vault   = vault
         self._router  = router
         self._max     = max_agents
+        self._toolkit = toolkit
         self._agents:  dict[str, dict]          = {}
         self._runners: dict[str, AgentRunner]   = {}
         self._tasks:   dict[str, asyncio.Task]  = {}
@@ -95,6 +97,7 @@ class AgentManager:
             llm_override=llm_override,
             router=self._router,
             vault=self._vault,
+            toolkit=self._toolkit,
         )
         self._runners[agent_id] = runner
         self._tasks[agent_id] = asyncio.create_task(runner.run())
